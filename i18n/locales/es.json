@@ -1,0 +1,127 @@
+{
+  "onboarding": {
+    "welcome_title": "RetroCam AI",
+    "welcome_subtitle": "Shoot authentic analog, right on your digital device.",
+    "start": "Get Started",
+    "skip": "Skip",
+    "continue": "Continue",
+    "finish": "Finish 🚀",
+    "building_title": "Setting up your camera...",
+    "building_subtitle": "Calibrating film stocks",
+    "starburst_title": "Cameras Ready! 🎉",
+    "lang_approval": {
+      "title": "Language Detection",
+      "desc": "We detected your language. Switch language?"
+    }
+  },
+  "questions": {
+    "1": {
+      "q": "What is your photography style?",
+      "options": ["Street", "Portrait", "Landscape", "Vintage Aesthetic"]
+    },
+    "2": {
+      "q": "Do you have analog experience?",
+      "options": ["Never", "A little", "I am a pro"]
+    },
+    "3": {
+      "q": "Favorite film type?",
+      "options": ["Color Film", "B&W Film", "VHS Video", "Polaroid"]
+    },
+    "4": {
+      "q": "What will you use RetroCam for?",
+      "options": ["As a hobby", "Social Media", "Professional work"]
+    }
+  },
+  "features": {
+    "1": { "title": "Authentic Simulation", "desc": "Real film stocks captured and digitized." },
+    "2": { "title": "120+ Light Effects", "desc": "Leaks, dust, and grain applied dynamically." },
+    "3": { "title": "Precision Control", "desc": "Adjust time, exposure, and focus manually." },
+    "4": { "title": "Sleek Comparison", "desc": "See original vs processed instantly." },
+    "5": { "title": "Premium Unlock", "desc": "Experience vintage analog with zero limits." },
+    "6": { "title": "Used by 1M+ Creators", "desc": "Join our community." }
+  },
+  "premium_intro": {
+    "title": "Go Premium",
+    "subtitle": "Unlock all 40+ cameras",
+    "f1_title": "Infinite Resolution",
+    "f1_desc": "Export in maximum quality without compression",
+    "f2_title": "No Watermarks",
+    "f2_desc": "Clean and professional exports",
+    "f3_title": "All Cameras",
+    "f3_desc": "VHS, 8mm, Polaroid and more"
+  },
+  "paywall": {
+    "title": "Upgrade to PRO",
+    "subtitle": "Unlock all cameras and features",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "per_week": "/week",
+    "per_month": "/month",
+    "per_year": "/year",
+    "best_value": "Best Value",
+    "restore": "Restore Purchase",
+    "trial": "Start 3-Day Free Trial",
+    "then": "then {{price}} {{period}}",
+    "trial_disclaimer": "3-day free trial. Renews automatically unless cancelled.",
+    "package_not_found": "Package not found.",
+    "welcome_pro_title": "Welcome to Pro!",
+    "start_exploring": "Start Exploring",
+    "no_subscription_found": "No active subscription found.",
+    "benefit_1": "Access all 40+ cameras",
+    "benefit_2": "Infinite resolution export",
+    "benefit_3": "No ads, no watermarks",
+    "benefit_4": "Priority AI processing",
+    "benefit_5": "Exclusive golden hour features",
+    "benefit_6": "Cancel anytime"
+  },
+  "free_limit": {
+    "title": "Switching to Free Mode",
+    "desc": "In free mode, you can only use 3 cameras. Upgrade to Pro to unlock everything."
+  },
+  "common": {
+    "free": "FREE",
+    "daily": "Daily",
+    "all": "All",
+    "trending": "Trending",
+    "import": "Import",
+    "video": "Video",
+    "random": "Random",
+    "error": "Error",
+    "success": "Success",
+    "ok": "OK",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_use": "Terms of Use"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "about": "About",
+    "pro_title": "RetroCam Pro",
+    "pro_subtitle": "Unlock all cameras & remove watermarks",
+    "upgrade": "Upgrade",
+    "restore": "Restore Purchases",
+    "rate": "Rate RetroCam",
+    "contact": "Contact Support",
+    "privacy": "Privacy Policy"
+  },
+  "video": {
+    "hint": "9:16 · Max 60s · Saves to gallery",
+    "effect": {
+      "clean": "Clean",
+      "vhs": "VHS",
+      "glitch": "Glitch",
+      "rgb": "RGB"
+    }
+  },
+  "camera_types": {
+    "disposable": "Disposable",
+    "modern": "Modern",
+    "vhs": "VHS",
+    "120": "120 Format",
+    "8mm": "8mm Cinema",
+    "digital-y2k": "Y2K Digital",
+    "half-frame": "Half Frame",
+    "b-w": "Black & White"
+  }
+}

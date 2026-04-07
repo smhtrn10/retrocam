@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "RetroCam",
+    "slug": "Retrocam",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "retrocam",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.retrocam.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.retrocam.app"
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://retrocam.com/"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow RetroCam to access your photos.",
+          "savePhotosPermission": "Allow RetroCam to save photos.",
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow RetroCam to access your camera.",
+          "microphonePermission": "Allow RetroCam to access your microphone."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow RetroCam to access your photos to select images.",
+          "cameraPermission": "Allow RetroCam to take photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow RetroCam to use your location."
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-localization",
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

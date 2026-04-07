@@ -1,0 +1,376 @@
+import { useRef, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  Alert,
+} from 'react-native';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import * as Haptics from 'expo-haptics';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import { X, Video, Square, Aperture, Zap } from 'lucide-react-native';
+import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
+import { CameraCarousel } from '@/components/CameraCarousel';
+import { usePurchases } from '@/hooks/usePurchases';
+
+// VHS effect presets — only show video-friendly ones
+const VIDEO_PRESETS = CAMERA_PRESETS.filter((p) =>
+  ['vhs-memory', 'vhs-glitch', 'vhs-lo-fi', 'vhs-neon', 'vhs-summer',
+   'tokyo-1998', 'super8', 'night-vision', 'crisp-clean', 'tokyo-night',
+   'classic-m', 'd-classic', 'ccd-r', 'd-exp'].includes(p.id)
+);
+
+type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
+
+ export default function VideoScreen() {
+  const { t } = useTranslation();
+  const [camPermission, requestCamPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [isRecording, setIsRecording] = useState(false);
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(VIDEO_PRESETS[0]);
+  const [effect, setEffect] = useState<VideoEffect>('none');
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const cameraRef = useRef<CameraView>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { isPro, showPaywall } = usePurchases();
+
+  const effectLabel: Record<VideoEffect, string> = {
+    none: 'Clean',
+    vhs: 'VHS',
+    glitch: 'Glitch',
+    rgb: 'RGB',
+  };
+
+  const cycleEffect = useCallback(() => {
+    const effects: VideoEffect[] = ['none', 'vhs', 'glitch', 'rgb'];
+    setEffect((prev) => {
+      const idx = effects.indexOf(prev);
+      return effects[(idx + 1) % effects.length];
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!cameraRef.current || isRecording) return;
+    
+    if (!isPro && selectedPreset.isPro) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showPaywall(selectedPreset.id);
+      return;
+    }
+
+    // Ensure permissions
+    if (!camPermission?.granted) { await requestCamPermission(); return; }
+    if (!micPermission?.granted) { await requestMicPermission(); return; }
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setIsRecording(true);
+    setRecordingSeconds(0);
+
+    timerRef.current = setInterval(() => {
+      setRecordingSeconds((s) => s + 1);
+    }, 1000);
+
+    try {
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+      });
+
+      if (video?.uri) {
+        let saved = false;
+        try {
+          // 1. Try direct saving (works on some Android/iOS versions without prompt)
+          await MediaLibrary.saveToLibraryAsync(video.uri);
+          saved = true;
+        } catch (e) {
+          try {
+            // 2. Try with explicit permission request
+            const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+            if (status === 'granted') {
+              await MediaLibrary.saveToLibraryAsync(video.uri);
+              saved = true;
+            }
+          } catch (pe) {
+            // Permission request failed or was rejected (common in Expo Go Android 13+)
+            console.log('MediaLibrary permission rejected in Expo Go');
+          }
+        }
+
+        if (saved) {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Saved!', 'Video saved to your gallery');
+        } else {
+          // 3. Final fallback to Sharing (opens system menu with "Save to device" option)
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(video.uri, { dialogTitle: 'Save your video' });
+          } else {
+            Alert.alert('Error', 'Could not save video.');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Record error:', err);
+    }
+  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission]);
+
+  const stopRecording = useCallback(() => {
+    if (!cameraRef.current || !isRecording) return;
+    cameraRef.current.stopRecording();
+    setIsRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [isRecording]);
+
+  const formatTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  // VHS scanline overlay
+  const scanlineOpacity = effect === 'vhs' ? 0.12 : 0;
+  // RGB split — shown as colored border tint
+  const rgbActive = effect === 'rgb';
+  // Glitch — flicker tint
+  const glitchActive = effect === 'glitch';
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
+          <X size={22} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('common.video')}</Text>
+        <TouchableOpacity style={styles.iconButton} onPress={cycleEffect}>
+          <Zap size={22} color={effect !== 'none' ? '#FFB800' : '#FFFFFF'} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Camera — 9:16 aspect ratio */}
+      <View style={styles.cameraWrapper}>
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing={facing}
+          mode="video"
+          videoQuality="1080p"
+        />
+
+        {/* Tint overlay */}
+        {selectedPreset.settings.tintOpacity > 0 && (
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity },
+            ]}
+          />
+        )}
+
+        {/* VHS scanlines */}
+        {scanlineOpacity > 0 && (
+          <View style={[styles.scanlines, { opacity: scanlineOpacity }]} />
+        )}
+
+        {/* RGB split border */}
+        {rgbActive && (
+          <>
+            <View style={[styles.rgbLayer, { borderColor: 'rgba(255,0,0,0.25)', transform: [{ translateX: -3 }] }]} />
+            <View style={[styles.rgbLayer, { borderColor: 'rgba(0,0,255,0.25)', transform: [{ translateX: 3 }] }]} />
+          </>
+        )}
+
+        {/* Glitch tint */}
+        {glitchActive && (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,255,200,0.06)' }]} />
+        )}
+
+        {/* Vignette */}
+        {selectedPreset.settings.vignette > 0 && (
+          <View style={[styles.vignette, { opacity: selectedPreset.settings.vignette * 0.8 }]} />
+        )}
+
+        {/* Effect badge */}
+        {effect !== 'none' && (
+          <View style={styles.effectBadge}>
+            <Text style={styles.effectBadgeText}>{effectLabel[effect]}</Text>
+          </View>
+        )}
+
+        {/* Recording timer */}
+        {isRecording && (
+          <View style={styles.recIndicator}>
+            <View style={styles.recDot} />
+            <Text style={styles.recTime}>{formatTime(recordingSeconds)}</Text>
+          </View>
+        )}
+
+        {/* Timestamp */}
+        {selectedPreset.settings.timestamp && (
+          <Text style={styles.timestamp}>
+            {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+          </Text>
+        )}
+      </View>
+
+      {/* Bottom controls */}
+      <View style={styles.bottomContainer}>
+        <CameraCarousel
+          presets={VIDEO_PRESETS}
+          selectedId={selectedPreset.id}
+          onSelect={(preset) => {
+            if (!isPro && preset.isPro) {
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              showPaywall(preset.id);
+            } else {
+              setSelectedPreset(preset);
+            }
+          }}
+          isPro={isPro}
+        />
+
+        <View style={styles.controls}>
+          <TouchableOpacity
+            style={styles.flipButton}
+            onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
+          >
+            <Aperture size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {/* Record button */}
+          <TouchableOpacity
+            style={[styles.recordButton, isRecording && styles.recordingButton]}
+            onPress={isRecording ? stopRecording : startRecording}
+          >
+            {isRecording ? (
+              <Square size={28} color="#FFFFFF" fill="#FFFFFF" />
+            ) : (
+              <Video size={28} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.placeholder} />
+        </View>
+
+        <Text style={styles.hint}>{t('video.hint')}</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  iconButton: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  cameraWrapper: {
+    flex: 1,
+    aspectRatio: 9 / 16,
+    alignSelf: 'center',
+    overflow: 'hidden',
+    borderRadius: 12,
+    width: '100%',
+  },
+  camera: { flex: 1 },
+  scanlines: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundImage: undefined,
+    // Simulated scanlines via repeating semi-transparent stripes
+    backgroundColor: 'transparent',
+    borderTopWidth: 2,
+    borderTopColor: 'rgba(0,0,0,0.15)',
+  },
+  rgbLayer: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderRadius: 12,
+  },
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
+  },
+  effectBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(255,184,0,0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  effectBadgeText: { color: '#000', fontSize: 11, fontWeight: '700' },
+  recIndicator: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 6,
+  },
+  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
+  recTime: { color: '#FFF', fontSize: 12, fontWeight: '600' },
+  timestamp: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    color: 'rgba(255,180,50,0.9)',
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  bottomContainer: {
+    backgroundColor: '#000',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+  },
+  flipButton: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  recordButton: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 4, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  recordingButton: {
+    backgroundColor: '#FF3B30',
+    borderColor: '#FFFFFF',
+  },
+  placeholder: { width: 48 },
+  hint: {
+    color: '#555',
+    fontSize: 11,
+    textAlign: 'center',
+    paddingBottom: 4,
+  },
+});

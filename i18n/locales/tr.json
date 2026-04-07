@@ -1,0 +1,127 @@
+{
+  "onboarding": {
+    "welcome_title": "RetroCam AI",
+    "welcome_subtitle": "Gerçek analog deneyimini dijital cihazınızda yaşayın.",
+    "start": "Başla",
+    "skip": "Atla",
+    "continue": "Devam Et",
+    "finish": "Bitir 🚀",
+    "building_title": "Kameranız hazırlanıyor...",
+    "building_subtitle": "Film efektleri kalibre ediliyor",
+    "starburst_title": "Kameralar Hazır! 🎉",
+    "lang_approval": {
+      "title": "Dil Algılama",
+      "desc": "Cihaz dilinizi algıladık. Dili değiştirmek ister misiniz?"
+    }
+  },
+  "questions": {
+    "1": {
+      "q": "Fotoğrafçılık tarzınız nedir?",
+      "options": ["Sokak", "Portre", "Manzara", "Vintage Estetik"]
+    },
+    "2": {
+      "q": "Analog deneyiminiz var mı?",
+      "options": ["Hiç", "Biraz", "Profesyonelim"]
+    },
+    "3": {
+      "q": "Favori film tipiniz?",
+      "options": ["Renkli Film", "Siyah & Beyaz", "VHS Video", "Polaroid"]
+    },
+    "4": {
+      "q": "RetroCam'i ne için kullanacaksınız?",
+      "options": ["Hobi olarak", "Sosyal Medya", "Profesyonel işler"]
+    }
+  },
+  "features": {
+    "1": { "title": "Otantik Simülasyon", "desc": "Gerçek filmler dijitalleştirildi." },
+    "2": { "title": "120+ Işık Efekti", "desc": "Sızıntı, toz ve gren dinamik olarak uygulanır." },
+    "3": { "title": "Hassas Kontrol", "desc": "Zamanı, pozu ve odağı manuel ayarlayın." },
+    "4": { "title": "Etkili Karşılaştırma", "desc": "Orijinal ve işleneni anında görün." },
+    "5": { "title": "Premium Kilidini Aç", "desc": "Sınır tanımadan vintage analog deneyimi." },
+    "6": { "title": "1 Milyon+ Kreatör", "desc": "Topluluğumuza katılın." }
+  },
+  "premium_intro": {
+    "title": "Premium'a Geç",
+    "subtitle": "40+ kameranın tamamını aç",
+    "f1_title": "Sonsuz Çözünürlük",
+    "f1_desc": "Kaliteden ödün vermeden dışa aktar",
+    "f2_title": "Su Damgası Yok",
+    "f2_desc": "Temiz ve profesyonel görüntüler",
+    "f3_title": "Tüm Kameralar",
+    "f3_desc": "VHS, 8mm, Polaroid ve daha fazlası"
+  },
+  "paywall": {
+    "title": "PRO'ya Yüksel",
+    "subtitle": "Tüm kamera ve özelliklerin kilidini aç",
+    "weekly": "Haftalık",
+    "monthly": "Aylık",
+    "yearly": "Yıllık",
+    "per_week": "/hafta",
+    "per_month": "/ay",
+    "per_year": "/yıl",
+    "best_value": "En İyi Değer",
+    "restore": "Satın Almayı Kurtar",
+    "trial": "3 Günlük Ücretsiz Denemeyi Başlat",
+    "then": "sonra {{price}} {{period}}",
+    "trial_disclaimer": "3 gün ücretsiz deneme. İptal edilmezse otomatik yenilenir.",
+    "package_not_found": "Paket bulunamadı.",
+    "welcome_pro_title": "Pro'ya Hoş Geldin!",
+    "start_exploring": "Keşfetmeye Başla",
+    "no_subscription_found": "Aktif abonelik bulunamadı.",
+    "benefit_1": "40+ kameranın tamamına erişim",
+    "benefit_2": "Sonsuz çözünürlük aktarımı",
+    "benefit_3": "Reklam yok, filigran yok",
+    "benefit_4": "Öncelikli yapay zeka işleme",
+    "benefit_5": "Özel altın saat özellikleri",
+    "benefit_6": "İstediğin zaman iptal et"
+  },
+  "free_limit": {
+    "title": "Ücretsiz Moda Geçiliyor",
+    "desc": "Ücretsiz modda sadece 3 kamera kullanabilirsiniz. Tüm kameralar için Pro'ya geçin."
+  },
+  "common": {
+    "free": "ÜCRETSİZ",
+    "daily": "Günlük",
+    "all": "Tümü",
+    "trending": "Trendler",
+    "import": "İçe Aktar",
+    "video": "Video",
+    "random": "Rastgele",
+    "error": "Hata",
+    "success": "Başarılı",
+    "ok": "Tamam",
+    "privacy_policy": "Gizlilik Politikası",
+    "terms_of_use": "Kullanım Koşulları"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "account": "Hesap",
+    "about": "Hakkında",
+    "pro_title": "RetroCam Pro",
+    "pro_subtitle": "Tüm kameraları aç ve fligranı kaldır",
+    "upgrade": "Yükselt",
+    "restore": "Satın Almaları Kurtar",
+    "rate": "RetroCam'i Değerlendir",
+    "contact": "Destekle İletişime Geç",
+    "privacy": "Gizlilik Politikası"
+  },
+  "video": {
+    "hint": "9:16 · Max 60s · Galeriye Kaydeder",
+    "effect": {
+      "clean": "Temiz",
+      "vhs": "VHS",
+      "glitch": "Glitch",
+      "rgb": "RGB"
+    }
+  },
+  "camera_types": {
+    "disposable": "Kullan At",
+    "modern": "Modern",
+    "vhs": "VHS",
+    "120": "120 Format",
+    "8mm": "8mm Sinema",
+    "digital-y2k": "Y2K Dijital",
+    "half-frame": "Half Frame",
+    "b-w": "Siyah Beyaz"
+  }
+}
