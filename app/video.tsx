@@ -24,12 +24,9 @@ import { buildFFmpegCommand } from '@/utils/videoFilter';
 let FFmpegKit: any = null;
 try { FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit; } catch { /* Expo Go */ }
 
-// VHS effect presets — only show video-friendly ones
-const VIDEO_PRESETS = CAMERA_PRESETS.filter((p) =>
-  ['vhs-memory', 'vhs-glitch', 'vhs-lo-fi', 'vhs-neon', 'vhs-summer',
-   'tokyo-1998', 'super8', 'night-vision', 'crisp-clean', 'tokyo-night',
-   'classic-m', 'd-classic', 'ccd-r', 'd-exp'].includes(p.id)
-);
+// Show all presets in video screen, default to free vhs-glitch
+const VIDEO_PRESETS = CAMERA_PRESETS;
+const DEFAULT_VIDEO_PRESET = CAMERA_PRESETS.find(p => p.id === 'vhs-glitch') ?? CAMERA_PRESETS[0];
 
 type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
 
@@ -53,7 +50,7 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
     }, [])
   );
   const [facing, setFacing] = useState<'front' | 'back'>('back');
-  const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(VIDEO_PRESETS[0]);
+  const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(DEFAULT_VIDEO_PRESET);
   const [effect, setEffect] = useState<VideoEffect>('none');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const cameraRef = useRef<CameraView>(null);

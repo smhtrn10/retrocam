@@ -381,7 +381,7 @@ export const CAMERA_PRESETS: CameraPreset[] = [
     name: 'VHS Glitch',
     description: 'VHS · Corrupted tape, RGB chaos',
     color: '#00FFFF',
-    isPro: true, pack: 'vhs', cameraType: 'vhs', frameType: 'vhs',
+    isPro: false, pack: 'vhs', cameraType: 'vhs', frameType: 'vhs',
     settings: { grain: 0.6, temperature: 0, vignette: 0.5, blur: 0.2, contrast: 1.3, saturation: 1.4, lightLeak: 0.6, dust: 0.25, timestamp: true, fade: 0.05, tint: '#00FFFF', tintOpacity: 0.08, flash: 0, halation: 0, rgbShift: 0.25 },
   },
   {
