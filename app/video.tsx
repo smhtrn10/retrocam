@@ -5,21 +5,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as MediaLibrary from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
 import { X, Video, Square, Aperture, Zap } from 'lucide-react-native';
 import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { usePurchases } from '@/hooks/usePurchases';
-import { buildFFmpegCommand } from '@/utils/videoFilter';
 
 let FFmpegKit: any = null;
 try {
@@ -41,7 +36,6 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const isRecordingRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
 
   useFocusEffect(
@@ -108,54 +102,11 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
       if (video?.uri) {
-        // Apply FFmpeg filter if available (not in Expo Go)
-        let finalUri = video.uri;
-
-        if (FFmpegKit) {
-          try {
-            setIsProcessing(true);
-            const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
-            const cmd = buildFFmpegCommand(video.uri, outputUri, selectedPreset.settings);
-            console.log('[RetroCam] FFmpeg command:', cmd);
-            const session = await FFmpegKit.execute(cmd);
-            const returnCode = await session.getReturnCode();
-            console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
-            if (returnCode?.isValueSuccess()) {
-              finalUri = outputUri;
-              console.log('[RetroCam] FFmpeg success, filtered video:', outputUri);
-            } else {
-              const logs = await session.getLogs();
-              console.warn('[RetroCam] FFmpeg failed. Logs:', logs?.map((l: any) => l.getMessage()).join('\n'));
-            }
-          } catch (ffErr) {
-            console.warn('[RetroCam] FFmpeg error:', ffErr);
-          } finally {
-            setIsProcessing(false);
-          }
-        }
-
-        let saved = false;
-        try {
-          await MediaLibrary.saveToLibraryAsync(finalUri);
-          saved = true;
-        } catch {
-          try {
-            const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
-            if (status === 'granted') {
-              await MediaLibrary.saveToLibraryAsync(finalUri);
-              saved = true;
-            }
-          } catch { /* noop */ }
-        }
-
-        if (saved) {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Saved!', 'Video saved to your gallery');
-        } else if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(finalUri, { dialogTitle: 'Save your video' });
-        } else {
-          Alert.alert('Error', 'Could not save video.');
-        }
+        // Navigate to preview screen — FFmpeg filter applied there
+        router.push({
+          pathname: '/video-preview' as any,
+          params: { uri: video.uri, presetId: selectedPreset.id },
+        });
       }
     } catch (err) {
       console.error('Record error:', err);
@@ -250,7 +201,7 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         )}
 
         {/* Processing overlay */}
-        {isProcessing && (
+        {false && (
           <View style={styles.processingOverlay}>
             <Text style={styles.processingText}>Applying filter...</Text>
           </View>

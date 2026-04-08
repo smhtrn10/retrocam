@@ -1,0 +1,298 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
+import { X, Download, Share2 } from 'lucide-react-native';
+import { CAMERA_PRESETS } from '@/constants/presets';
+import { buildFFmpegArgs } from '@/utils/videoFilter';
+
+let FFmpegKit: any = null;
+try {
+  FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit;
+  console.log('[RetroCam] VideoPreview: FFmpegKit loaded');
+} catch {
+  console.log('[RetroCam] VideoPreview: FFmpegKit not available (Expo Go)');
+}
+
+export default function VideoPreviewScreen() {
+  const { uri, presetId } = useLocalSearchParams<{ uri: string; presetId: string }>();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [filteredUri, setFilteredUri] = useState<string>(uri);
+  const [filterApplied, setFilterApplied] = useState(false);
+  const [filterFailed, setFilterFailed] = useState(false);
+  // Track temp files for cleanup
+  const tempFilesRef = useRef<string[]>([]);
+
+  const preset = CAMERA_PRESETS.find(p => p.id === presetId) ?? CAMERA_PRESETS[0];
+
+  const player = useVideoPlayer(filteredUri, p => {
+    p.loop = true;
+    p.play();
+  });
+
+  // Apply FFmpeg filter on mount
+  useEffect(() => {
+    if (!FFmpegKit || !uri) return;
+
+    const applyFilter = async () => {
+      setIsProcessing(true);
+      setFilterFailed(false);
+      const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
+
+      try {
+        // Use array API — safe for paths with spaces or special chars
+        const args = buildFFmpegArgs(uri, outputUri, preset.settings);
+        console.log('[RetroCam] FFmpeg args:', args);
+
+        // Use array API if available (safer), fallback to string API
+        let session;
+        if (typeof FFmpegKit.executeWithArguments === 'function') {
+          session = await FFmpegKit.executeWithArguments(args);
+        } else {
+          session = await FFmpegKit.execute(args.join(' '));
+        }
+        const returnCode = await session.getReturnCode();
+        console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
+
+        if (returnCode?.isValueSuccess()) {
+          tempFilesRef.current.push(outputUri);
+          setFilteredUri(outputUri);
+          setFilterApplied(true);
+          player.replace(outputUri);
+          player.play();
+          console.log('[RetroCam] Filter applied:', outputUri);
+        } else {
+          const logs = await session.getLogs();
+          const errMsg = logs?.map((l: any) => l.getMessage()).join('\n') ?? 'Unknown error';
+          console.warn('[RetroCam] FFmpeg failed:', errMsg);
+          setFilterFailed(true);
+          // Show user feedback
+          Alert.alert(
+            'Filter Warning',
+            'Could not apply filter. Original video will be saved.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (e) {
+        console.warn('[RetroCam] FFmpeg error:', e);
+        setFilterFailed(true);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    applyFilter();
+  }, [uri]);
+
+  // Cleanup temp files on unmount
+  useEffect(() => {
+    return () => {
+      tempFilesRef.current.forEach(async (path) => {
+        try {
+          await FileSystem.deleteAsync(path, { idempotent: true });
+        } catch { /* noop */ }
+      });
+    };
+  }, []);
+
+  const saveToGallery = useCallback(async (fileUri: string) => {
+    // Check permission first to avoid double dialog on iOS
+    const { status } = await MediaLibrary.getPermissionsAsync();
+    if (status !== 'granted') {
+      const { status: newStatus } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+      if (newStatus !== 'granted') return false;
+    }
+    await MediaLibrary.saveToLibraryAsync(fileUri);
+    return true;
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setIsSaving(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const saved = await saveToGallery(filteredUri);
+      if (saved) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Saved!', 'Video saved to your gallery');
+      } else if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filteredUri, { dialogTitle: 'Save your video' });
+      } else {
+        Alert.alert('Error', 'Could not save video.');
+      }
+    } catch (e) {
+      console.error('Save error:', e);
+      Alert.alert('Error', 'Failed to save video');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [filteredUri, saveToGallery]);
+
+  const handleShare = useCallback(async () => {
+    setIsSharing(true);
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filteredUri, { mimeType: 'video/mp4' });
+      }
+    } catch { /* noop */ }
+    finally { setIsSharing(false); }
+  }, [filteredUri]);
+
+  const statusBadge = () => {
+    if (!FFmpegKit) return <Text style={styles.badgeWarn}>Preview Only (Expo Go)</Text>;
+    if (isProcessing) return <Text style={styles.badgeProcessing}>Processing...</Text>;
+    if (filterApplied) return <Text style={styles.badgeSuccess}>✓ Filter Applied</Text>;
+    if (filterFailed) return <Text style={styles.badgeWarn}>⚠ Filter Failed — Original</Text>;
+    return null;
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
+          <X size={22} color="#FFF" />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.presetName}>{preset.name}</Text>
+          {statusBadge()}
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Video Player */}
+      <View style={styles.videoContainer}>
+        <VideoView
+          player={player}
+          style={styles.video}
+          contentFit="cover"
+          nativeControls={false}
+        />
+
+        {/* Overlay effects shown only when filter not yet applied */}
+        {!filterApplied && preset.settings.tintOpacity > 0 && (
+          <View style={[StyleSheet.absoluteFillObject, {
+            backgroundColor: preset.settings.tint,
+            opacity: preset.settings.tintOpacity,
+          }]} />
+        )}
+        {!filterApplied && preset.settings.vignette > 0 && (
+          <View style={[styles.vignette, { opacity: preset.settings.vignette * 0.9 }]} />
+        )}
+
+        {/* Processing overlay */}
+        {isProcessing && (
+          <View style={styles.processingOverlay}>
+            <ActivityIndicator color="#FFB800" size="large" />
+            <Text style={styles.processingText}>Applying {preset.name} filter...</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Info */}
+      <View style={styles.infoStrip}>
+        <View style={[styles.presetDot, { backgroundColor: preset.color }]} />
+        <Text style={styles.presetDesc}>{preset.description}</Text>
+      </View>
+
+      {/* Actions */}
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnSecondary, (isSharing || isProcessing) && styles.actionBtnDisabled]}
+          onPress={handleShare}
+          disabled={isSharing || isProcessing}
+        >
+          {isSharing ? <ActivityIndicator color="#FFF" size="small" /> : <Share2 size={20} color="#FFF" />}
+          <Text style={styles.actionBtnText}>Share</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnPrimary, (isSaving || isProcessing) && styles.actionBtnDisabled]}
+          onPress={handleSave}
+          disabled={isSaving || isProcessing}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="#000" size="small" />
+          ) : (
+            <>
+              <Download size={20} color="#000" />
+              <Text style={[styles.actionBtnText, { color: '#000' }]}>Save</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  iconButton: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  presetName: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  badgeSuccess: { color: '#06D6A0', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  badgeWarn: { color: '#FFB800', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  badgeProcessing: { color: '#888', fontSize: 11, marginTop: 2 },
+  videoContainer: { flex: 1, backgroundColor: '#000', position: 'relative' },
+  video: { flex: 1 },
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
+  },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  processingText: { color: '#FFB800', fontSize: 14, fontWeight: '700' },
+  infoStrip: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 10, gap: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  presetDot: { width: 10, height: 10, borderRadius: 5 },
+  presetDesc: { color: '#666', fontSize: 12, flex: 1 },
+  actions: {
+    flexDirection: 'row', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 16,
+  },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8,
+    paddingVertical: 14, borderRadius: 28,
+  },
+  actionBtnPrimary: { backgroundColor: '#FFB800' },
+  actionBtnSecondary: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  actionBtnDisabled: { opacity: 0.4 },
+  actionBtnText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+});
