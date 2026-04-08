@@ -66,9 +66,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   const nameTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!permission?.granted && permission?.status === 'undetermined') {
-      void requestPermission();
-    }
+    // Permission is handled during onboarding
   }, [permission, requestPermission]);
 
   const dailyCamera = useMemo(() => {

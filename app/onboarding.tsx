@@ -14,9 +14,10 @@ import { BuildingScreen } from '@/components/onboarding/BuildingScreen';
 import { FeatureSlides } from '@/components/onboarding/FeatureSlides';
 import { StarBurstScreen } from '@/components/onboarding/StarBurstScreen';
 import { PremiumIntroScreen } from '@/components/onboarding/PremiumIntroScreen';
-import PaywallModal from './paywall'; // If we use it as modal, else we can route there.
+import { PermissionScreen } from '@/components/onboarding/PermissionScreen';
+import PaywallModal from './paywall';
 
-type OnboardingPhase = 'welcome' | 'chat' | 'building' | 'features' | 'starburst' | 'premiumIntro';
+type OnboardingPhase = 'welcome' | 'permissions' | 'chat' | 'building' | 'features' | 'starburst' | 'premiumIntro';
 
 export default function OnboardingScreen() {
   const { t } = useTranslation();
@@ -91,10 +92,16 @@ export default function OnboardingScreen() {
       case 'welcome':
         return (
           <WelcomeScreen 
-            onContinue={() => transitionTo('chat')}
+            onContinue={() => transitionTo('permissions')}
             title={t('onboarding.welcome_title', 'RetroCam AI')}
             subtitle={t('onboarding.welcome_subtitle', 'Shoot authentic analog.')}
             buttonText={t('onboarding.start', 'Get Started')}
+          />
+        );
+      case 'permissions':
+        return (
+          <PermissionScreen
+            onContinue={() => transitionTo('chat')}
           />
         );
       case 'chat':
