@@ -16,14 +16,6 @@ import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { usePurchases } from '@/hooks/usePurchases';
 
-let FFmpegKit: any = null;
-try {
-  FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit;
-  console.log('[RetroCam] FFmpegKit loaded:', !!FFmpegKit);
-} catch (e) {
-  console.log('[RetroCam] FFmpegKit not available (Expo Go):', e);
-}
-
 // Show all presets in video screen, default to free vhs-glitch
 const VIDEO_PRESETS = CAMERA_PRESETS;
 const DEFAULT_VIDEO_PRESET = CAMERA_PRESETS.find(p => p.id === 'vhs-glitch') ?? CAMERA_PRESETS[0];

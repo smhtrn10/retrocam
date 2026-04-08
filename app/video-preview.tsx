@@ -52,11 +52,11 @@ export default function VideoPreviewScreen() {
     const applyFilter = async () => {
       setIsProcessing(true);
       setFilterFailed(false);
+      const safeUri = decodeURIComponent(uri);
       const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
 
       try {
-        // Use array API — safe for paths with spaces or special chars
-        const args = buildFFmpegArgs(uri, outputUri, preset.settings);
+        const args = buildFFmpegArgs(safeUri, outputUri, preset.settings);
         console.log('[RetroCam] FFmpeg args:', args);
 
         // Use array API if available (safer), fallback to string API
@@ -75,8 +75,7 @@ export default function VideoPreviewScreen() {
           setFilterApplied(true);
           player.replace(outputUri);
           player.play();
-          console.log('[RetroCam] Filter applied:', outputUri);
-        } else {
+          console.log('[RetroCam] Filter applied:', outputUri);        } else {
           const logs = await session.getLogs();
           const errMsg = logs?.map((l: any) => l.getMessage()).join('\n') ?? 'Unknown error';
           console.warn('[RetroCam] FFmpeg failed:', errMsg);
@@ -97,7 +96,7 @@ export default function VideoPreviewScreen() {
     };
 
     applyFilter();
-  }, [uri]);
+  }, [uri, player]);
 
   // Cleanup temp files on unmount
   useEffect(() => {
