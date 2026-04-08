@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "RetroCam",
-    "slug": "Retrocam",
+    "slug": "retrocam",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,28 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.retrocam.app"
+      "bundleIdentifier": "com.retrocam.app",
+      "buildNumber": "2",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.retrocam.app"
+      "package": "com.retrocam.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -37,8 +51,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow RetroCam to access your photos.",
-          "savePhotosPermission": "Allow RetroCam to save photos.",
+          "photosPermission": "RetroCam accesses your photo library so you can select existing photos and apply retro filters to them.",
+          "savePhotosPermission": "RetroCam saves your edited retro-style photos and videos directly to your photo library.",
           "granularPermissions": [
             "photo",
             "video"
@@ -48,30 +62,39 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow RetroCam to access your camera.",
-          "microphonePermission": "Allow RetroCam to access your microphone."
+          "cameraPermission": "RetroCam uses your camera to capture photos and apply retro-style filters in real time. For example, you can shoot a photo and instantly see it transformed with a vintage film look.",
+          "microphonePermission": "RetroCam uses the microphone to record audio while capturing retro-style video clips. For example, when you record a video, the microphone captures sound so your clip includes audio."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow RetroCam to access your photos to select images.",
-          "cameraPermission": "Allow RetroCam to take photos."
+          "photosPermission": "RetroCam accesses your photo library so you can select existing photos and apply retro filters to them.",
+          "cameraPermission": "RetroCam uses your camera to capture photos and apply retro-style filters in real time."
         }
       ],
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow RetroCam to use your location."
-        }
-      ],
+
       "expo-font",
       "expo-web-browser",
       "expo-localization",
-      "expo-video"
+      "expo-video",
+      [
+        "@config-plugins/ffmpeg-kit-react-native",
+        {
+          "package": "video"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://retrocam.com/"
+      },
+      "eas": {
+        "projectId": "76b32914-4a2e-4223-900a-6f52286ad17d"
+      }
     }
   }
 }

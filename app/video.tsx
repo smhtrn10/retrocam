@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,19 @@ import {
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { router } from 'expo-router';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { X, Video, Square, Aperture, Zap } from 'lucide-react-native';
 import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { usePurchases } from '@/hooks/usePurchases';
+import { buildFFmpegCommand } from '@/utils/videoFilter';
+
+let FFmpegKit: any = null;
+try { FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit; } catch { /* Expo Go */ }
 
 // VHS effect presets — only show video-friendly ones
 const VIDEO_PRESETS = CAMERA_PRESETS.filter((p) =>
@@ -33,7 +37,21 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
   const { t } = useTranslation();
   const [camPermission, requestCamPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const isRecordingRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(() => setIsCameraActive(true), 300);
+      return () => {
+        clearTimeout(t);
+        if (isRecordingRef.current) cameraRef.current?.stopRecording();
+        setIsCameraActive(false);
+      };
+    }, [])
+  );
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(VIDEO_PRESETS[0]);
   const [effect, setEffect] = useState<VideoEffect>('none');
@@ -67,12 +85,12 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
       return;
     }
 
-    // Ensure permissions
     if (!camPermission?.granted) { await requestCamPermission(); return; }
     if (!micPermission?.granted) { await requestMicPermission(); return; }
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsRecording(true);
+    isRecordingRef.current = true;
     setRecordingSeconds(0);
 
     timerRef.current = setInterval(() => {
@@ -80,52 +98,73 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
     }, 1000);
 
     try {
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: 60,
-      });
+      const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
+
+      // Recording finished — clean up state immediately
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
       if (video?.uri) {
+        // Apply FFmpeg filter if available (not in Expo Go)
+        let finalUri = video.uri;
+
+        if (FFmpegKit) {
+          try {
+            setIsProcessing(true);
+            const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
+            const cmd = buildFFmpegCommand(video.uri, outputUri, selectedPreset.settings);
+            const session = await FFmpegKit.execute(cmd);
+            const returnCode = await session.getReturnCode();
+            if (returnCode?.isValueSuccess()) {
+              finalUri = outputUri;
+            } else {
+              console.warn('FFmpeg filter failed, saving original');
+            }
+          } catch (ffErr) {
+            console.warn('FFmpeg error:', ffErr);
+          } finally {
+            setIsProcessing(false);
+          }
+        }
+
         let saved = false;
         try {
-          // 1. Try direct saving (works on some Android/iOS versions without prompt)
-          await MediaLibrary.saveToLibraryAsync(video.uri);
+          await MediaLibrary.saveToLibraryAsync(finalUri);
           saved = true;
-        } catch (e) {
+        } catch {
           try {
-            // 2. Try with explicit permission request
             const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
             if (status === 'granted') {
-              await MediaLibrary.saveToLibraryAsync(video.uri);
+              await MediaLibrary.saveToLibraryAsync(finalUri);
               saved = true;
             }
-          } catch (pe) {
-            // Permission request failed or was rejected (common in Expo Go Android 13+)
-            console.log('MediaLibrary permission rejected in Expo Go');
-          }
+          } catch { /* noop */ }
         }
 
         if (saved) {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert('Saved!', 'Video saved to your gallery');
+        } else if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(finalUri, { dialogTitle: 'Save your video' });
         } else {
-          // 3. Final fallback to Sharing (opens system menu with "Save to device" option)
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(video.uri, { dialogTitle: 'Save your video' });
-          } else {
-            Alert.alert('Error', 'Could not save video.');
-          }
+          Alert.alert('Error', 'Could not save video.');
         }
       }
     } catch (err) {
       console.error('Record error:', err);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     }
-  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission]);
+  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission, selectedPreset]);
 
   const stopRecording = useCallback(() => {
     if (!cameraRef.current || !isRecording) return;
     cameraRef.current.stopRecording();
     setIsRecording(false);
-    if (timerRef.current) clearInterval(timerRef.current);
+    isRecordingRef.current = false;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, [isRecording]);
 
@@ -152,15 +191,17 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         </TouchableOpacity>
       </View>
 
-      {/* Camera — 9:16 aspect ratio */}
+      {/* Camera — only mount when active */}
       <View style={styles.cameraWrapper}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing={facing}
-          mode="video"
-          videoQuality="1080p"
-        />
+        {isCameraActive && (
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing={facing}
+            mode="video"
+            videoQuality="1080p"
+          />
+        )}
 
         {/* Tint overlay */}
         {selectedPreset.settings.tintOpacity > 0 && (
@@ -199,6 +240,13 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         {effect !== 'none' && (
           <View style={styles.effectBadge}>
             <Text style={styles.effectBadgeText}>{effectLabel[effect]}</Text>
+          </View>
+        )}
+
+        {/* Processing overlay */}
+        {isProcessing && (
+          <View style={styles.processingOverlay}>
+            <Text style={styles.processingText}>Applying filter...</Text>
           </View>
         )}
 
@@ -307,6 +355,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 80,
+  },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingText: {
+    color: '#FFB800',
+    fontSize: 14,
+    fontWeight: '700',
   },
   effectBadge: {
     position: 'absolute',

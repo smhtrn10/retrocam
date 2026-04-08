@@ -30,3 +30,17 @@ export function getVignetteParams(width: number, height: number, strength: numbe
     opacity: strength,
   };
 }
+
+export function applyColorMatrix(imageData: ImageData, matrix: number[]): ImageData {
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    data[i] = Math.min(255, Math.max(0, r * matrix[0] + g * matrix[1] + b * matrix[2] + matrix[4] * 255));
+    data[i + 1] = Math.min(255, Math.max(0, r * matrix[5] + g * matrix[6] + b * matrix[7] + matrix[9] * 255));
+    data[i + 2] = Math.min(255, Math.max(0, r * matrix[10] + g * matrix[11] + b * matrix[12] + matrix[14] * 255));
+  }
+  return imageData;
+}

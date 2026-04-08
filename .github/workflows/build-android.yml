@@ -1,0 +1,86 @@
+name: Android APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: 🏗 Checkout repo
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🔧 Install NDK 27
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006" --sdk_root=$ANDROID_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.1.12297006" >> $GITHUB_ENV
+
+      - name: 📦 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 📦 Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: 🔧 Install Expo CLI
+        run: bun add -g @expo/cli@latest
+
+      - name: 🏗 Expo Prebuild (generates android/ + applies plugins)
+        run: npx expo prebuild --platform android --clean --no-install
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: 🔍 Verify ffmpeg-kit patch applied
+        run: |
+          echo "=== ffmpeg-kit build.gradle ==="
+          cat node_modules/ffmpeg-kit-react-native/android/build.gradle | grep -A5 "dependencies {" || echo "not found"
+          echo "=== android/libs ==="
+          ls -lh android/libs/ || echo "libs dir empty or missing"
+
+      - name: 🔑 Make Gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: 🏗 Build Release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g" \
+            -Dorg.gradle.parallel=false
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn

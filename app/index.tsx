@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -48,6 +49,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   
   const [aspectRatio, setAspectRatio] = useState<'full' | '1:1' | '3:2' | '4:5'>('full');
   const [isSnapMode, setIsSnapMode] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(() => setIsCameraActive(true), 300);
+      return () => {
+        clearTimeout(t);
+        setIsCameraActive(false);
+      };
+    }, [])
+  );
 
   // Preset name fade animation
   const nameOpacity = useRef(new Animated.Value(1)).current;
@@ -194,13 +206,15 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
       {/* ── Camera ── */}
       <View style={[styles.cameraContainer, { backgroundColor: '#000', justifyContent: 'center' }]}>
         <View style={{ width: getCameraSize.width, height: getCameraSize.height, overflow: 'hidden', alignSelf: 'center' }}>
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing={facing}
-            mode="picture"
-            responsiveOrientationWhenOrientationLocked
-          />
+          {isCameraActive && (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              mode="picture"
+              responsiveOrientationWhenOrientationLocked
+            />
+          )}
         </View>
 
         {/* Preset overlays — absolute over camera, NOT inside CameraView */}

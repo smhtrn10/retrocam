@@ -16,7 +16,7 @@ import { usePurchases } from '@/hooks/usePurchases';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
-  const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete } = usePurchases();
+  const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete, simulateDevPurchase } = usePurchases();
 
   const handleRestore = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -116,15 +116,23 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* PR-2: DEV butonları sadece __DEV__ modunda görünür */}
-        {/* __DEV__ && (
+        {/* DEV Tools — sadece __DEV__ modunda görünür */}
+        {__DEV__ && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>DEV Tools</Text>
+            <TouchableOpacity style={styles.row} onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              void simulateDevPurchase();
+            }}>
+              <Crown size={20} color="rgba(255,100,100,0.8)" />
+              <Text style={styles.devText}>Simulate Pro Purchase</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.row} onPress={handleRestartOnboarding}>
+              <RefreshCcw size={20} color="rgba(255,100,100,0.8)" />
               <Text style={styles.devText}>Restart Onboarding</Text>
             </TouchableOpacity>
           </View>
-        ) */}
+        )}
 
         <View style={styles.footer}>
           <Text style={styles.version}>RetroCam AI v1.0</Text>
