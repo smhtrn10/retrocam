@@ -215,18 +215,30 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
           )}
         </View>
 
-        {/* Preset overlays — absolute over camera, NOT inside CameraView */}
+        {/* Preset overlays — matched to FilteredImage Skia rendering */}
         {selectedPreset.settings.tintOpacity > 0 && (
           <View style={[styles.overlay, { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} />
         )}
         {selectedPreset.settings.vignette > 0 && (
-          <View style={[styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.85 }]} />
+          <View style={[styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} />
         )}
         {selectedPreset.settings.lightLeak > 0 && (
-          <View style={[styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.45 }]} />
+          <View style={[styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} />
         )}
         {selectedPreset.settings.grain > 0 && (
-          <View style={[styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.2 }]} />
+          <View style={[styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} />
+        )}
+        {selectedPreset.settings.rgbShift > 0 && (
+          <>
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,0,0,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: selectedPreset.settings.rgbShift * 8 }] }]} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,255,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: -selectedPreset.settings.rgbShift * 8 }] }]} />
+          </>
+        )}
+        {selectedPreset.settings.halation > 0 && (
+          <View style={[styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} />
+        )}
+        {selectedPreset.settings.flash > 0 && (
+          <View style={[styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} />
         )}
         {selectedPreset.settings.timestamp && (
           <Text style={styles.timestamp}>
@@ -424,6 +436,18 @@ const styles = StyleSheet.create({
   grainOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(140,130,120,0.18)',
+  },
+  halationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    shadowColor: '#FF3C00',
+    shadowOffset: { width: 0, height: -40 },
+    shadowOpacity: 1,
+    shadowRadius: 80,
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,240,0.25)',
   },
   timestamp: {
     position: 'absolute',

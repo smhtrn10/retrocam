@@ -22,7 +22,12 @@ import { usePurchases } from '@/hooks/usePurchases';
 import { buildFFmpegCommand } from '@/utils/videoFilter';
 
 let FFmpegKit: any = null;
-try { FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit; } catch { /* Expo Go */ }
+try {
+  FFmpegKit = require('ffmpeg-kit-react-native').FFmpegKit;
+  console.log('[RetroCam] FFmpegKit loaded:', !!FFmpegKit);
+} catch (e) {
+  console.log('[RetroCam] FFmpegKit not available (Expo Go):', e);
+}
 
 // Show all presets in video screen, default to free vhs-glitch
 const VIDEO_PRESETS = CAMERA_PRESETS;
@@ -111,15 +116,19 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
             setIsProcessing(true);
             const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
             const cmd = buildFFmpegCommand(video.uri, outputUri, selectedPreset.settings);
+            console.log('[RetroCam] FFmpeg command:', cmd);
             const session = await FFmpegKit.execute(cmd);
             const returnCode = await session.getReturnCode();
+            console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
             if (returnCode?.isValueSuccess()) {
               finalUri = outputUri;
+              console.log('[RetroCam] FFmpeg success, filtered video:', outputUri);
             } else {
-              console.warn('FFmpeg filter failed, saving original');
+              const logs = await session.getLogs();
+              console.warn('[RetroCam] FFmpeg failed. Logs:', logs?.map((l: any) => l.getMessage()).join('\n'));
             }
           } catch (ffErr) {
-            console.warn('FFmpeg error:', ffErr);
+            console.warn('[RetroCam] FFmpeg error:', ffErr);
           } finally {
             setIsProcessing(false);
           }
