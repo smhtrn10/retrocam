@@ -1,12 +1,6 @@
 /**
- * FilteredImage — Full Skia-powered filter engine
- * - ColorMatrix: contrast, saturation, temperature, fade
- * - Blur: soft focus
- * - RadialGradient: real vignette
- * - LinearGradient: real light leak, halation, flash
- * - Turbulence: real film grain noise
- * - RuntimeShader: RGB chromatic aberration shift
- * - Dust & scratches: seeded particles
+ * FilteredImage — Single Skia Canvas, all effects rendered inside.
+ * capture() always snapshots the single canvas → correct filtered output.
  */
 import { useMemo, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
@@ -18,6 +12,7 @@ import {
   Blur,
   Group,
   RoundedRect,
+  Rect,
   Circle,
   RadialGradient,
   LinearGradient as SkiaLinearGradient,
@@ -25,6 +20,7 @@ import {
   vec,
   useCanvasRef,
   ImageFormat,
+  ClipOp,
 } from '@shopify/react-native-skia';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CameraPreset } from '@/constants/presets';
@@ -62,7 +58,6 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
       try {
         const snapshot = await canvasRef.current?.makeImageSnapshotAsync();
         if (!snapshot) return null;
-        // encodeToBase64 avoids stack overflow from large byte arrays
         const base64 = snapshot.encodeToBase64(ImageFormat.JPEG, 92);
         const filename = `retrocam_filtered_${Date.now()}.jpg`;
         const fileUri = (FileSystem.documentDirectory ?? '') + filename;
@@ -110,135 +105,122 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
     return <View style={{ width, height, backgroundColor: '#000' }} />;
   }
 
-  // Build the core image layer with color grading + rgb shift
-  const renderImageLayer = (w: number, h: number) => {
-    const shift = settings.rgbShift * w * 0.015;
-    return (
-      <Group>
-        <SkiaImage image={image} x={0} y={0} width={w} height={h} fit="cover">
-          <ColorMatrix matrix={colorMatrix} />
-          {settings.blur > 0 && <Blur blur={settings.blur * 8} />}
-        </SkiaImage>
-        {/* RGB chromatic aberration: red channel shifted right, blue shifted left */}
-        {settings.rgbShift > 0 && (
-          <>
-            <SkiaImage image={image} x={shift} y={0} width={w} height={h} fit="cover" opacity={0.35}>
-              <ColorMatrix matrix={[
-                1, 0, 0, 0, 0,
-                0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0,
-                0, 0, 0, 1, 0,
-              ]} />
-            </SkiaImage>
-            <SkiaImage image={image} x={-shift} y={0} width={w} height={h} fit="cover" opacity={0.35}>
-              <ColorMatrix matrix={[
-                0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0,
-                0, 0, 1, 0, 0,
-                0, 0, 0, 1, 0,
-              ]} />
-            </SkiaImage>
-          </>
-        )}
-      </Group>
-    );
-  };
+  const shift = settings.rgbShift * width * 0.015;
 
-  // All overlay effects as Skia primitives
-  const renderEffects = (w: number, h: number) => (
+  // Core image with color grading
+  const imageLayer = (x: number, y: number, w: number, h: number) => (
     <Group>
-      {/* Tint color wash */}
-      {settings.tintOpacity > 0 && (
-        <RoundedRect x={0} y={0} width={w} height={h} r={0}
-          color={settings.tint} opacity={settings.tintOpacity} />
+      <SkiaImage image={image} x={x} y={y} width={w} height={h} fit="cover">
+        <ColorMatrix matrix={colorMatrix} />
+        {settings.blur > 0 && <Blur blur={settings.blur * 8} />}
+      </SkiaImage>
+      {settings.rgbShift > 0 && (
+        <>
+          <SkiaImage image={image} x={x + shift} y={y} width={w} height={h} fit="cover" opacity={0.35}>
+            <ColorMatrix matrix={[1,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,1,0]} />
+          </SkiaImage>
+          <SkiaImage image={image} x={x - shift} y={y} width={w} height={h} fit="cover" opacity={0.35}>
+            <ColorMatrix matrix={[0,0,0,0,0, 0,0,0,0,0, 0,0,1,0,0, 0,0,0,1,0]} />
+          </SkiaImage>
+        </>
       )}
+    </Group>
+  );
 
-      {/* Real radial vignette */}
+  // Overlay effects (tint, vignette, grain, etc.)
+  const effectLayer = (x: number, y: number, w: number, h: number) => (
+    <Group>
+      {settings.tintOpacity > 0 && (
+        <Rect x={x} y={y} width={w} height={h} color={settings.tint} opacity={settings.tintOpacity} />
+      )}
       {settings.vignette > 0 && (
-        <RoundedRect x={0} y={0} width={w} height={h} r={0}>
+        <Rect x={x} y={y} width={w} height={h}>
           <RadialGradient
-            c={vec(w / 2, h / 2)}
+            c={vec(x + w / 2, y + h / 2)}
             r={Math.max(w, h) * 0.72}
             colors={['transparent', `rgba(0,0,0,${settings.vignette * 0.9})`]}
           />
-        </RoundedRect>
+        </Rect>
       )}
-
-      {/* Real linear light leak (top-left corner) */}
       {settings.lightLeak > 0 && (
-        <RoundedRect x={0} y={0} width={w * 0.7} height={h * 0.55} r={0}>
+        <Rect x={x} y={y} width={w * 0.7} height={h * 0.55}>
           <SkiaLinearGradient
-            start={vec(0, 0)}
-            end={vec(w * 0.7, h * 0.55)}
+            start={vec(x, y)}
+            end={vec(x + w * 0.7, y + h * 0.55)}
             colors={[`rgba(255,180,50,${settings.lightLeak * 0.5})`, 'transparent']}
           />
-        </RoundedRect>
+        </Rect>
       )}
-
-      {/* Real halation glow (red highlight bleed) */}
       {settings.halation > 0 && (
-        <RoundedRect x={w * 0.1} y={0} width={w * 0.8} height={h * 0.6} r={0}>
+        <Rect x={x + w * 0.1} y={y} width={w * 0.8} height={h * 0.6}>
           <SkiaLinearGradient
-            start={vec(w * 0.5, 0)}
-            end={vec(w * 0.5, h * 0.6)}
+            start={vec(x + w * 0.5, y)}
+            end={vec(x + w * 0.5, y + h * 0.6)}
             colors={[`rgba(255,60,0,${settings.halation * 0.45})`, 'transparent']}
           />
-        </RoundedRect>
+        </Rect>
       )}
-
-      {/* Flash burn (center overexposure) */}
       {settings.flash > 0 && (
-        <RoundedRect x={w * 0.1} y={h * 0.05} width={w * 0.8} height={h * 0.7} r={0}>
+        <Rect x={x + w * 0.1} y={y + h * 0.05} width={w * 0.8} height={h * 0.7}>
           <RadialGradient
-            c={vec(w / 2, h * 0.35)}
+            c={vec(x + w / 2, y + h * 0.35)}
             r={Math.max(w, h) * 0.5}
             colors={[`rgba(255,255,240,${settings.flash * 0.65})`, 'transparent']}
           />
-        </RoundedRect>
+        </Rect>
       )}
-
-      {/* Real film grain using Turbulence noise */}
       {settings.grain > 0 && (
-        <RoundedRect x={0} y={0} width={w} height={h} r={0} opacity={settings.grain * 0.55}>
+        <Rect x={x} y={y} width={w} height={h} opacity={settings.grain * 0.55}>
           <Turbulence freqX={0.65} freqY={0.65} octaves={3} />
-        </RoundedRect>
+        </Rect>
       )}
-
-      {/* Dust particles */}
       {dustParticles.map((p, i) => (
-        <Circle key={`d${i}`} cx={p.x} cy={p.y} r={p.size / 2}
+        <Circle key={`d${i}`} cx={x + p.x} cy={y + p.y} r={p.size / 2}
           color={`rgba(200,190,170,${p.opacity})`} />
       ))}
-
-      {/* Film scratches */}
       {scratches.map((sc, i) => (
-        <RoundedRect key={`sc${i}`} x={sc.x} y={sc.top} width={1} height={sc.h} r={0}
+        <Rect key={`sc${i}`} x={x + sc.x} y={y + sc.top} width={1} height={sc.h}
           color={`rgba(255,255,255,${sc.opacity})`} />
       ))}
     </Group>
   );
 
-  const renderCanvas = (w: number, h: number) => (
-    <Canvas ref={canvasRef} style={{ position: 'absolute', width: w, height: h }}>
-      {renderImageLayer(w, h)}
-      {renderEffects(w, h)}
-    </Canvas>
-  );
+  // Sprocket holes for film frames
+  const sprocketHoles = (side: 'left' | 'right', sw: number) => {
+    const sx = side === 'left' ? 0 : width - sw;
+    return Array.from({ length: 10 }).map((_, i) => (
+      <Rect key={`sp${side}${i}`}
+        x={sx + 3} y={i * (height / 10) + 3}
+        width={sw - 6} height={height / 10 - 6}
+        r={2} color="#222" />
+    ));
+  };
+
+  // Watermark text rendered outside canvas (React Native Text)
+  const watermarkEl = showWatermark ? <Text style={styles.watermark}>RetroCam AI</Text> : null;
+  const timestampEl = settings.timestamp ? <Text style={styles.timestamp}>{timestampStr}</Text> : null;
 
   // ── POLAROID ──
   if (frameType === 'polaroid') {
-    const polBorder = Math.round(width * 0.05);
-    const polBottom = Math.round(width * 0.18);
-    const imgW = width - polBorder * 2;
-    const imgH = height - polBorder - polBottom;
+    const pb = Math.round(width * 0.05);
+    const pbot = Math.round(width * 0.18);
+    const imgW = width - pb * 2;
+    const imgH = height - pb - pbot;
     return (
       <View style={{ width, height, backgroundColor: '#FFF' }}>
-        <View style={{ position: 'absolute', left: polBorder, top: polBorder, width: imgW, height: imgH, overflow: 'hidden' }}>
-          {renderCanvas(imgW, imgH)}
-          {settings.timestamp && <Text style={[styles.timestamp, { bottom: 8, right: 8 }]}>{timestampStr}</Text>}
-        </View>
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          <Rect x={0} y={0} width={width} height={height} color="#FFF" />
+          <Group clip={{ x: pb, y: pb, width: imgW, height: imgH }}>
+            {imageLayer(pb, pb, imgW, imgH)}
+            {effectLayer(pb, pb, imgW, imgH)}
+          </Group>
+          {showWatermark && (
+            <RoundedRect x={pb} y={pb + imgH + 4} width={imgW} height={pbot - 8} r={0} color="transparent" />
+          )}
+        </Canvas>
+        {settings.timestamp && <Text style={[styles.timestamp, { bottom: pbot + 4, right: pb + 8 }]}>{timestampStr}</Text>}
         {showWatermark && (
-          <View style={{ position: 'absolute', left: 0, top: polBorder + imgH, width, height: polBottom, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 6 }}>
+          <View style={{ position: 'absolute', left: 0, top: pb + imgH, width, height: pbot, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 6 }}>
             <Text style={styles.watermarkDark}>RetroCam AI</Text>
           </View>
         )}
@@ -251,43 +233,55 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
     const halfW = Math.floor(width / 2) - 6;
     return (
       <View style={{ width, height, backgroundColor: '#000' }}>
-        <View style={{ position: 'absolute', left: 4, top: 0, width: halfW, height, overflow: 'hidden' }}>
-          {renderCanvas(halfW, height)}
-        </View>
-        <View style={{ position: 'absolute', left: halfW + 8, top: 0, width: halfW, height, overflow: 'hidden' }}>
-          {renderCanvas(halfW, height)}
-        </View>
-        <View style={{ position: 'absolute', left: halfW + 4, top: 0, width: 4, height, backgroundColor: '#111' }} />
-        {Array.from({ length: 8 }).map((_, i) => (
-          <View key={`hl${i}`} style={{ position: 'absolute', left: 2, top: i * (height / 8) + 4, width: 8, height: height / 8 - 8, borderRadius: 2, backgroundColor: '#1A1A1A' }} />
-        ))}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <View key={`hr${i}`} style={{ position: 'absolute', right: 2, top: i * (height / 8) + 4, width: 8, height: height / 8 - 8, borderRadius: 2, backgroundColor: '#1A1A1A' }} />
-        ))}
-        {settings.timestamp && <Text style={styles.timestamp}>{timestampStr}</Text>}
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          <Rect x={0} y={0} width={width} height={height} color="#000" />
+          {/* Left panel */}
+          <Group clip={{ x: 4, y: 0, width: halfW, height }}>
+            {imageLayer(4, 0, halfW, height)}
+            {effectLayer(4, 0, halfW, height)}
+          </Group>
+          {/* Right panel */}
+          <Group clip={{ x: halfW + 8, y: 0, width: halfW, height }}>
+            {imageLayer(halfW + 8, 0, halfW, height)}
+            {effectLayer(halfW + 8, 0, halfW, height)}
+          </Group>
+          {/* Divider */}
+          <Rect x={halfW + 4} y={0} width={4} height={height} color="#111" />
+          {/* Sprocket holes */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Rect key={`hl${i}`} x={2} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
+          ))}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Rect key={`hr${i}`} x={width - 10} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
+          ))}
+        </Canvas>
+        {timestampEl}
+        {watermarkEl}
       </View>
     );
   }
 
   // ── 8mm / 16mm ──
   if (frameType === '8mm' || frameType === '16mm') {
-    const sprocketW = frameType === '16mm' ? 28 : 22;
-    const innerW = width - sprocketW * 2;
+    const sw = frameType === '16mm' ? 28 : 22;
+    const innerW = width - sw * 2;
     return (
       <View style={{ width, height, backgroundColor: '#0A0A0A' }}>
-        <View style={{ position: 'absolute', left: sprocketW, top: 0, width: innerW, height, overflow: 'hidden' }}>
-          {renderCanvas(innerW, height)}
-          {settings.timestamp && <Text style={styles.timestamp}>{timestampStr}</Text>}
-        </View>
-        {[0, 1].map((side) => (
-          <View key={side} style={{ position: 'absolute', [side === 0 ? 'left' : 'right']: 0, top: 0, width: sprocketW, height, backgroundColor: '#111' }}>
-            {Array.from({ length: 10 }).map((_, i) => (
-              <View key={i} style={{ position: 'absolute', left: 3, top: i * (height / 10) + 3, width: sprocketW - 6, height: height / 10 - 6, borderRadius: 2, backgroundColor: '#222' }} />
-            ))}
-          </View>
-        ))}
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          <Rect x={0} y={0} width={width} height={height} color="#0A0A0A" />
+          <Group clip={{ x: sw, y: 0, width: innerW, height }}>
+            {imageLayer(sw, 0, innerW, height)}
+            {effectLayer(sw, 0, innerW, height)}
+          </Group>
+          {/* Left sprocket strip */}
+          <Rect x={0} y={0} width={sw} height={height} color="#111" />
+          {sprocketHoles('left', sw)}
+          {/* Right sprocket strip */}
+          <Rect x={width - sw} y={0} width={sw} height={height} color="#111" />
+          {sprocketHoles('right', sw)}
+        </Canvas>
+        {timestampEl}
+        {watermarkEl}
       </View>
     );
   }
@@ -295,14 +289,19 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   // ── FISHEYE ──
   if (frameType === 'fisheye') {
     const fishR = Math.min(width, height) * 0.46;
-    const fishD = fishR * 2;
+    const cx = width / 2;
+    const cy = height / 2;
     return (
       <View style={{ width, height, backgroundColor: '#000' }}>
-        <View style={{ position: 'absolute', left: width / 2 - fishR, top: height / 2 - fishR, width: fishD, height: fishD, borderRadius: fishR, overflow: 'hidden' }}>
-          {renderCanvas(fishD, fishD)}
-        </View>
-        {settings.timestamp && <Text style={styles.timestamp}>{timestampStr}</Text>}
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          <Rect x={0} y={0} width={width} height={height} color="#000" />
+          <Group clip={<Circle cx={cx} cy={cy} r={fishR} />}>
+            {imageLayer(cx - fishR, cy - fishR, fishR * 2, fishR * 2)}
+            {effectLayer(cx - fishR, cy - fishR, fishR * 2, fishR * 2)}
+          </Group>
+        </Canvas>
+        {timestampEl}
+        {watermarkEl}
       </View>
     );
   }
@@ -311,10 +310,14 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   if (frameType === 'camcorder') {
     return (
       <View style={{ width, height }}>
-        {renderCanvas(width, height)}
-        {Array.from({ length: Math.floor(height / 5) }).map((_, i) => (
-          <View key={i} style={{ position: 'absolute', left: 0, top: i * 5, width, height: 1, backgroundColor: 'rgba(0,0,0,0.05)' }} />
-        ))}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          {imageLayer(0, 0, width, height)}
+          {effectLayer(0, 0, width, height)}
+          {/* Scanlines */}
+          {Array.from({ length: Math.floor(height / 5) }).map((_, i) => (
+            <Rect key={i} x={0} y={i * 5} width={width} height={1} color="rgba(0,0,0,0.05)" />
+          ))}
+        </Canvas>
         <View style={styles.camcorderTopBar}>
           <View style={styles.recDot} /><Text style={styles.recText}>REC</Text>
           <Text style={styles.camcorderMid}>SP  Hi8</Text>
@@ -326,7 +329,7 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
           )}
           <View style={styles.zoomTrack}><View style={styles.zoomFill} /></View>
         </View>
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        {watermarkEl}
       </View>
     );
   }
@@ -335,13 +338,16 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   if (frameType === 'vhs') {
     return (
       <View style={{ width, height }}>
-        {renderCanvas(width, height)}
-        {Array.from({ length: Math.floor(height / 4) }).map((_, i) => (
-          <View key={i} style={{ position: 'absolute', left: 0, top: i * 4, width, height: 1, backgroundColor: 'rgba(0,0,0,0.07)' }} />
-        ))}
-        <View style={{ position: 'absolute', left: 0, top: height * 0.72, width, height: 3, backgroundColor: 'rgba(255,255,255,0.04)' }} />
-        {settings.timestamp && <Text style={styles.timestamp}>{timestampStr}</Text>}
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          {imageLayer(0, 0, width, height)}
+          {effectLayer(0, 0, width, height)}
+          {Array.from({ length: Math.floor(height / 4) }).map((_, i) => (
+            <Rect key={i} x={0} y={i * 4} width={width} height={1} color="rgba(0,0,0,0.07)" />
+          ))}
+          <Rect x={0} y={height * 0.72} width={width} height={3} color="rgba(255,255,255,0.04)" />
+        </Canvas>
+        {timestampEl}
+        {watermarkEl}
       </View>
     );
   }
@@ -350,13 +356,16 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   if (frameType === 'digital') {
     return (
       <View style={{ width, height }}>
-        {renderCanvas(width, height)}
+        <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+          {imageLayer(0, 0, width, height)}
+          {effectLayer(0, 0, width, height)}
+        </Canvas>
         <View style={styles.digitalTopBar}>
           {settings.timestamp && <Text style={styles.digitalText}>{timestampStr}</Text>}
           <Text style={styles.digitalText}>AUTO</Text>
         </View>
         <View style={styles.digitalBottomBar} />
-        {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+        {watermarkEl}
       </View>
     );
   }
@@ -364,9 +373,12 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   // ── DISPOSABLE / DEFAULT ──
   return (
     <View style={{ width, height, borderRadius: frameType === 'disposable' ? 8 : 0, overflow: 'hidden' }}>
-      {renderCanvas(width, height)}
-      {settings.timestamp && <Text style={styles.timestamp}>{timestampStr}</Text>}
-      {showWatermark && <Text style={styles.watermark}>RetroCam AI</Text>}
+      <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
+        {imageLayer(0, 0, width, height)}
+        {effectLayer(0, 0, width, height)}
+      </Canvas>
+      {timestampEl}
+      {watermarkEl}
     </View>
   );
 });

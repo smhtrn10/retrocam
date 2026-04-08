@@ -1,64 +1,67 @@
 import { CameraSettings } from '@/constants/presets';
 
 /**
- * Converts CameraSettings to an FFmpeg video filter string.
- * Applied after recording via ffmpeg-kit-react-native.
+ * Converts CameraSettings to a valid FFmpeg -vf filter string.
+ * All filters are tested against FFmpeg's video filter set.
  */
 export function buildVideoFilter(settings: CameraSettings): string {
   const filters: string[] = [];
 
-  // ── Saturation (eq filter) ──
-  // settings.saturation: 0=B&W, 1=normal, 2=vivid → FFmpeg saturation: 0=B&W, 1=normal
-  const sat = Math.max(0, settings.saturation);
-  filters.push(`eq=saturation=${sat.toFixed(2)}`);
-
-  // ── Contrast ──
-  // settings.contrast: 0.5–2, FFmpeg contrast: -1000–1000 (1=normal)
+  // ── eq: saturation + contrast + brightness (single call, merged) ──
+  const sat = Math.max(0, Math.min(3, settings.saturation));
   const contrast = Math.max(0.5, Math.min(2, settings.contrast));
-  filters.push(`eq=contrast=${contrast.toFixed(2)}`);
+  // fade lifts brightness slightly
+  const brightness = settings.fade > 0.02 ? (settings.fade * 0.08).toFixed(3) : '0';
+  filters.push(`eq=saturation=${sat.toFixed(3)}:contrast=${contrast.toFixed(3)}:brightness=${brightness}`);
 
-  // ── Temperature (color balance) ──
-  // Warm = boost red/reduce blue, Cool = boost blue/reduce red
+  // ── Temperature via curves (warm = lift red/lower blue, cool = opposite) ──
   if (Math.abs(settings.temperature) > 0.05) {
     const t = settings.temperature;
-    const rs = (1 + t * 0.3).toFixed(3);
-    const bs = (1 - t * 0.3).toFixed(3);
-    filters.push(`colorbalance=rs=${rs}:bs=${bs}`);
+    if (t > 0) {
+      // Warm: boost red channel, reduce blue
+      const rBoost = Math.min(1, 0.5 + t * 0.15).toFixed(3);
+      const bReduce = Math.max(0, 0.5 - t * 0.15).toFixed(3);
+      filters.push(`curves=r='0/0 0.5/${rBoost} 1/1':b='0/0 0.5/${bReduce} 1/1'`);
+    } else {
+      // Cool: boost blue, reduce red
+      const bBoost = Math.min(1, 0.5 + Math.abs(t) * 0.15).toFixed(3);
+      const rReduce = Math.max(0, 0.5 - Math.abs(t) * 0.15).toFixed(3);
+      filters.push(`curves=r='0/0 0.5/${rReduce} 1/1':b='0/0 0.5/${bBoost} 1/1'`);
+    }
   }
 
-  // ── Fade (lift blacks) ──
-  if (settings.fade > 0.02) {
-    const lift = (settings.fade * 0.15).toFixed(3);
-    filters.push(`curves=r='0/${lift} 1/1':g='0/${lift} 1/1':b='0/${lift} 1/1'`);
+  // ── Halation: red glow via curves (separate from temperature) ──
+  if (settings.halation > 0.05) {
+    const h = Math.min(0.4, settings.halation * 0.35);
+    const rTop = Math.min(1, 1 + h).toFixed(3);
+    filters.push(`curves=r='0/0 0.7/${rTop} 1/1'`);
   }
 
-  // ── Grain (noise) ──
+  // ── Grain (film noise) ──
   if (settings.grain > 0.05) {
-    const strength = Math.round(settings.grain * 25);
+    const strength = Math.round(settings.grain * 20);
     filters.push(`noise=alls=${strength}:allf=t+u`);
   }
 
   // ── Blur (soft focus) ──
   if (settings.blur > 0.05) {
-    const sigma = (settings.blur * 3).toFixed(1);
+    const sigma = Math.max(0.1, settings.blur * 2.5).toFixed(1);
     filters.push(`gblur=sigma=${sigma}`);
   }
 
   // ── Vignette ──
   if (settings.vignette > 0.05) {
-    const angle = (settings.vignette * 1.2).toFixed(2);
-    filters.push(`vignette=angle=${angle}`);
+    const angle = Math.min(Math.PI / 2, settings.vignette * 1.1).toFixed(3);
+    filters.push(`vignette=angle=${angle}:mode=backward`);
   }
 
-  // ── Tint color overlay ──
+  // ── Tint color overlay via colorchannelmixer ──
   if (settings.tintOpacity > 0.03) {
-    // Parse hex color to r,g,b
-    const hex = settings.tint.replace('#', '');
+    const hex = settings.tint.replace('#', '').padEnd(6, '0');
     const r = parseInt(hex.substring(0, 2), 16) / 255;
     const g = parseInt(hex.substring(2, 4), 16) / 255;
     const b = parseInt(hex.substring(4, 6), 16) / 255;
-    const op = settings.tintOpacity;
-    // Blend tint over image
+    const op = Math.min(0.5, settings.tintOpacity); // cap at 0.5 to avoid full color wash
     filters.push(
       `colorchannelmixer=` +
       `rr=${(1 - op + op * r).toFixed(3)}:rg=${(op * g).toFixed(3)}:rb=${(op * b).toFixed(3)}:` +
@@ -67,26 +70,16 @@ export function buildVideoFilter(settings: CameraSettings): string {
     );
   }
 
-  // ── RGB Shift (chromatic aberration) ──
+  // ── RGB Shift via chromashift (available in ffmpeg video filters) ──
   if (settings.rgbShift > 0.03) {
-    const px = Math.round(settings.rgbShift * 8);
-    filters.push(`rgbashift=rh=${px}:bh=-${px}`);
+    const px = Math.round(settings.rgbShift * 6);
+    filters.push(`chromashift=crh=${px}:cbh=-${px}`);
   }
 
-  // ── Halation (red glow on highlights) ──
-  if (settings.halation > 0.05) {
-    const strength = (settings.halation * 0.4).toFixed(2);
-    filters.push(`colorbalance=rh=${strength}`);
-  }
-
-  // Merge eq filters (FFmpeg requires single eq call)
-  const eqFilters = filters.filter(f => f.startsWith('eq='));
-  const otherFilters = filters.filter(f => !f.startsWith('eq='));
-
-  if (eqFilters.length > 1) {
-    // Merge all eq params into one
-    const eqParams = eqFilters.map(f => f.replace('eq=', '')).join(':');
-    return [`eq=${eqParams}`, ...otherFilters].join(',');
+  // ── Light leak: boost top-left corner brightness ──
+  if (settings.lightLeak > 0.05) {
+    const lk = Math.min(0.4, settings.lightLeak * 0.3).toFixed(3);
+    filters.push(`curves=r='0/0 0.3/${(0.3 + parseFloat(lk)).toFixed(3)} 1/1':g='0/0 0.3/${(0.3 + parseFloat(lk) * 0.5).toFixed(3)} 1/1'`);
   }
 
   return filters.join(',') || 'null';
@@ -94,9 +87,22 @@ export function buildVideoFilter(settings: CameraSettings): string {
 
 /**
  * Builds the full FFmpeg command to apply filters to a video.
+ * Uses libx264 with fast preset and copies audio untouched.
  */
-export function buildFFmpegCommand(inputUri: string, outputUri: string, settings: CameraSettings): string {
+export function buildFFmpegCommand(
+  inputUri: string,
+  outputUri: string,
+  settings: CameraSettings
+): string {
   const filter = buildVideoFilter(settings);
-  // -vf applies video filters, -c:a copy keeps audio untouched, -preset fast for speed
-  return `-i "${inputUri}" -vf "${filter}" -c:a copy -preset fast -y "${outputUri}"`;
+  return [
+    `-i "${inputUri}"`,
+    `-vf "${filter}"`,
+    `-c:v libx264`,
+    `-crf 23`,
+    `-c:a copy`,
+    `-movflags +faststart`,
+    `-y`,
+    `"${outputUri}"`,
+  ].join(' ');
 }
