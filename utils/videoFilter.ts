@@ -90,9 +90,8 @@ export function buildFFmpegArgs(
   return [
     '-i', inputUri,
     '-vf', filter,
-    '-c:v', 'libx264',       // Reverted to libx264 (now supported via full-gpl)
-    '-crf', '23',             // Constant Rate Factor for better quality control
-    '-preset', 'ultrafast',
+    '-c:v', 'mpeg4',         // Switch to mpeg4 for universal compatibility
+    '-q:v', '5',              // Variable bit rate for mpeg4 (high quality)
     '-pix_fmt', 'yuv420p',
     '-map', '0:v:0',           // Explicit video stream mapping (stable)
     '-map', '0:a:0?',          // Map first audio stream OPTIONALLY (prevents crash if silent)
