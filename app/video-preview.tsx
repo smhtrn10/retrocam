@@ -30,15 +30,12 @@ try {
   console.log('[RetroCam] VideoPreview: FFmpegKit not available (Expo Go)');
 }
 
-// Helper to remove file:// prefix for FFmpeg
+// Helper to get raw path for FFmpeg
 const getSafePath = (uri: string) => {
-  let path = uri;
-  if (path.startsWith('file://')) {
-    path = path.substring(7);
-  }
-  // KRİTİK #3: Removed double decodeURIComponent. 
-  // The URI passed here should already be decoded or handled at a single point.
-  return path;
+  if (!uri) return '';
+  // Single normalization point: handle arrays and decode once
+  const rawUri = decodeURIComponent(Array.isArray(uri) ? uri[0] : uri);
+  return rawUri.replace(/^file:\/\//, '');
 };
 
 export default function VideoPreviewScreen() {
@@ -49,15 +46,23 @@ export default function VideoPreviewScreen() {
   const [filteredUri, setFilteredUri] = useState<string>(uri);
   const [filterApplied, setFilterApplied] = useState(false);
   const [filterFailed, setFilterFailed] = useState(false);
+  
   // Track temp files for cleanup
   const tempFilesRef = useRef<string[]>([]);
-
   const preset = CAMERA_PRESETS.find(p => p.id === presetId) ?? CAMERA_PRESETS[0];
 
-  const player = useVideoPlayer(filteredUri, p => {
+  // ORTA #5: Pass filteredUri as the first argument to keep player in sync
+  const player = useVideoPlayer(filteredUri, (p) => {
     p.loop = true;
     p.play();
   });
+
+  // Keep player in sync with state (reactivity fix)
+  useEffect(() => {
+    if (player && filteredUri) {
+      player.replace(filteredUri);
+    }
+  }, [filteredUri, player]);
 
   // Apply FFmpeg filter on mount
   useEffect(() => {
@@ -67,49 +72,43 @@ export default function VideoPreviewScreen() {
       setIsProcessing(true);
       setFilterFailed(false);
       
-      // ORTA #6: Normalize path ONCE and use consistently
-      const decodedInputUri = decodeURIComponent(uri);
-      const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
+      // ORTA #6: Standardize path normalization (Single Point)
+      const rawInputPath = getSafePath(uri);
+      const fileUri = rawInputPath.startsWith('/') ? `file://${rawInputPath}` : rawInputPath;
+      
+      const fileName = `retrocam_video_${Date.now()}.mp4`;
+      const outputUri = (FileSystem.documentDirectory ?? '') + fileName;
+      const rawOutputPath = getSafePath(outputUri);
 
       try {
-        const inputPath = getSafePath(decodedInputUri);
-        const outputPath = getSafePath(outputUri);
-        
-        const args = buildFFmpegArgs(inputPath, outputPath, preset.settings);
-        console.log('[RetroCam] FFmpeg inputPath:', inputPath);
-        console.log('[RetroCam] FFmpeg outputPath:', outputPath);
+        const args = buildFFmpegArgs(rawInputPath, rawOutputPath, preset.settings);
+        console.log('[RetroCam] FFmpeg inputPath:', rawInputPath);
+        console.log('[RetroCam] FFmpeg outputPath:', rawOutputPath);
 
-        // Ensure input exists using the same normalized path (ORTA #6)
-        const inputExists = await FileSystem.getInfoAsync(decodedInputUri);
+        // Ensure input exists using coordinated path logic (ORTA #6)
+        const inputExists = await FileSystem.getInfoAsync(fileUri);
         if (!inputExists.exists) {
-          throw new Error(`Input file does not exist: ${inputPath}`);
+          throw new Error(`Input file does not exist: ${fileUri}`);
         }
 
         console.log('[RetroCam] Starting FFmpeg execution...');
 
         const session = await FFmpegKit.executeWithArguments(args);
         const returnCode = await session.getReturnCode();
-        const failStackTrace = await session.getFailStackTrace();
         
         console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
         
-        // ORTA #4: Use correct ReturnCode.isSuccess API
+        // ORTA #4: Strict ReturnCode validation
         if (ReturnCode && ReturnCode.isSuccess(returnCode)) {
-          // Success: Use the filtered video
+          console.log('[RetroCam] Filter applied successfully:', outputUri);
           tempFilesRef.current.push(outputUri);
           setFilteredUri(outputUri);
           setFilterApplied(true);
-          
-          // ORTA #5: Ensure player updates correctly
-          if (player) {
-            player.replace(outputUri);
-            player.play();
-          }
-          console.log('[RetroCam] Filter applied successfully:', outputUri);
         } else {
-          // Failure: Log detailed output and notify user
+          // Failure: Log detailed output
           const logs = await session.getLogs();
           const lastLogs = logs?.slice(-15).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
+          const failStackTrace = await session.getFailStackTrace();
           
           console.error('[RetroCam] FFmpeg failed with code:', returnCode?.getValue());
           console.error('[RetroCam] FFmpeg Error Logs:\n', lastLogs);
@@ -132,7 +131,7 @@ export default function VideoPreviewScreen() {
     };
 
     applyFilter();
-  }, [uri, player]);
+  }, [uri, preset.settings]); // Added preset.settings, removed player (dependency fix)
 
   // Cleanup temp files on unmount
   useEffect(() => {

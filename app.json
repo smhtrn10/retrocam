@@ -81,7 +81,7 @@
       [
         "@config-plugins/ffmpeg-kit-react-native",
         {
-          "package": "video"
+          "package": "full-gpl"
         }
       ]
     ],

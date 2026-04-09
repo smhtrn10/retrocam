@@ -97,7 +97,7 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         // Navigate to preview screen — FFmpeg filter applied there
         router.push({
           pathname: '/video-preview' as any,
-          params: { uri: video.uri, presetId: selectedPreset.id },
+          params: { uri: encodeURIComponent(video.uri), presetId: selectedPreset.id },
         });
       }
     } catch (err) {

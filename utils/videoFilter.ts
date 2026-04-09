@@ -39,7 +39,7 @@ export function buildVideoFilter(settings: CameraSettings): string {
   // ── 2. Grain ──
   if (settings.grain > 0.05) {
     const strength = Math.round(settings.grain * 20);
-    filters.push(`noise=alls=${strength}:allf=t`);
+    filters.push(`noise=alls=${strength}:allf=a`);
   }
 
   // ── 3. Blur ──
@@ -55,31 +55,23 @@ export function buildVideoFilter(settings: CameraSettings): string {
   }
 
   // ── 5. Color Correction (Temperature + Tint) ──
-  // Combined into one colorchannelmixer to avoid filter chain breaks (KRİTİK #2)
+  // Using high-compatibility filters (hue, eq) instead of colorchannelmixer (KRİTİK #2)
   const hasTemp = Math.abs(settings.temperature) > 0.05;
   const hasTint = settings.tintOpacity > 0.02;
 
-  if (hasTemp || hasTint) {
-    const t = hasTemp ? settings.temperature : 0;
-    const a = hasTint ? settings.tintOpacity : 0;
-    const rgb = hasTint ? hexToRgb(settings.tint) : { r: 255, g: 255, b: 255 };
+  if (hasTemp) {
+    // hue is safe in all ffmpeg-kit packages
+    const sat = settings.temperature > 0 ? 1 + settings.temperature * 0.3 : 1 + settings.temperature * 0.2;
+    filters.push(`hue=s=${sat.toFixed(3)}`);
+  }
 
+  if (hasTint) {
+    const rgb = hexToRgb(settings.tint);
     if (rgb) {
-      // Temperature: Positive = Warm (Red up, Blue down), Negative = Cool (Blue up, Red down)
-      const tempR = 1 + t * 0.12;
-      const tempB = 1 - t * 0.12;
-      
-      // Tint overlay logic
-      const tintR = 1 - a + a * (rgb.r / 255);
-      const tintG = 1 - a + a * (rgb.g / 255);
-      const tintB = 1 - a + a * (rgb.b / 255);
-
-      // Merge both transforms
-      const rr = (tempR * tintR).toFixed(3);
-      const gg = (tintG).toFixed(3);
-      const bb = (tempB * tintB).toFixed(3);
-
-      filters.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`);
+      const a = settings.tintOpacity;
+      // Use eq brightness to simulate tint lifting
+      const br = (a * (rgb.r / 255 - 0.5) * 0.12).toFixed(3);
+      filters.push(`eq=brightness=${br}`);
     }
   }
 
@@ -98,14 +90,14 @@ export function buildFFmpegArgs(
   return [
     '-i', inputUri,
     '-vf', filter,
-    '-c:v', 'mpeg4',         // Switch to mpeg4 for universal package compatibility (KRİTİK #1)
-    '-q:v', '5',              // High quality for mpeg4 (CRF doesn't apply to native mpeg4)
+    '-c:v', 'libx264',       // Reverted to libx264 (now supported via full-gpl)
+    '-crf', '23',             // Constant Rate Factor for better quality control
     '-preset', 'ultrafast',
     '-pix_fmt', 'yuv420p',
-    '-map', '0:v',
-    '-map', '0:a?',           // Map audio ONLY IF it exists
-    '-c:a', 'copy',           // Try stream copy first for speed/stability (İYİLEŞTİRME #8)
+    '-map', '0:v:0',           // Explicit video stream mapping (stable)
+    '-c:a', 'copy',           // Stream copy for audio (fast/stable)
     '-movflags', '+faststart',
+    '-f', 'mp4',              // Explicitly set container format
     '-y',
     outputUri,
   ];
