@@ -117,14 +117,14 @@ export default function VideoPreviewScreen() {
           setFilterFailed(true);
           Alert.alert(
             'Filter Warning',
-            'Could not apply the cinematic filter. The original video will be saved instead.',
+            `Could not apply the cinematic filter. Error:\n\n${lastLogs.substring(0, 300)}...`,
             [{ text: 'OK' }]
           );
         }
       } catch (e: any) {
         console.error('[RetroCam] FFmpeg critical error:', e);
         setFilterFailed(true);
-        Alert.alert('Processing Error', 'An error occurred while applying filters.');
+        Alert.alert('Processing Error', `An error occurred: ${e.message}`);
       } finally {
         setIsProcessing(false);
       }
