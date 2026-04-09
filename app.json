@@ -55,7 +55,8 @@
           "savePhotosPermission": "RetroCam saves your edited retro-style photos and videos directly to your photo library.",
           "granularPermissions": [
             "photo",
-            "video"
+            "video",
+            "audio"
           ]
         }
       ],

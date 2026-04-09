@@ -51,31 +51,30 @@ export default function VideoPreviewScreen() {
   const tempFilesRef = useRef<string[]>([]);
   const preset = CAMERA_PRESETS.find(p => p.id === presetId) ?? CAMERA_PRESETS[0];
 
-  // ORTA #5: Pass filteredUri as the first argument to keep player in sync
-  const player = useVideoPlayer(filteredUri, (p) => {
+  // Initialize player with original uri — replace() called after filter is applied
+  const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.play();
   });
 
-  // Keep player in sync with state (reactivity fix)
+  // Replace source only when filteredUri actually changes (after FFmpeg succeeds)
   useEffect(() => {
-    if (player && filteredUri) {
+    if (player && filteredUri && filteredUri !== uri) {
       player.replace(filteredUri);
     }
-  }, [filteredUri, player]);
+  }, [filteredUri]); // intentionally exclude player and uri — only react to filter result
 
-  // Apply FFmpeg filter on mount
+  // Apply FFmpeg filter once on mount — uri and presetId are stable route params
   useEffect(() => {
     if (!FFmpegKit || !uri) return;
 
     const applyFilter = async () => {
       setIsProcessing(true);
       setFilterFailed(false);
-      
-      // ORTA #6: Standardize path normalization (Single Point)
+
       const rawInputPath = getSafePath(uri);
       const fileUri = rawInputPath.startsWith('/') ? `file://${rawInputPath}` : rawInputPath;
-      
+
       const fileName = `retrocam_video_${Date.now()}.mp4`;
       const outputUri = (FileSystem.documentDirectory ?? '') + fileName;
       const rawOutputPath = getSafePath(outputUri);
@@ -84,38 +83,33 @@ export default function VideoPreviewScreen() {
         const args = buildFFmpegArgs(rawInputPath, rawOutputPath, preset.settings);
         console.log('[RetroCam] FFmpeg inputPath:', rawInputPath);
         console.log('[RetroCam] FFmpeg outputPath:', rawOutputPath);
+        console.log('[RetroCam] FFmpeg filter args:', args.join(' '));
 
-        // Ensure input exists using coordinated path logic (ORTA #6)
         const inputExists = await FileSystem.getInfoAsync(fileUri);
         if (!inputExists.exists) {
           throw new Error(`Input file does not exist: ${fileUri}`);
         }
 
-        console.log('[RetroCam] Starting FFmpeg execution...');
-
         const session = await FFmpegKit.executeWithArguments(args);
         const returnCode = await session.getReturnCode();
-        
+
         console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
-        
-        // ORTA #4: Strict ReturnCode validation
+
         if (ReturnCode && ReturnCode.isSuccess(returnCode)) {
           console.log('[RetroCam] Filter applied successfully:', outputUri);
           tempFilesRef.current.push(outputUri);
           setFilteredUri(outputUri);
           setFilterApplied(true);
         } else {
-          // Failure: Log detailed output
           const logs = await session.getLogs();
           const lastLogs = logs?.slice(-15).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
           const failStackTrace = await session.getFailStackTrace();
-          
+
           console.error('[RetroCam] FFmpeg failed with code:', returnCode?.getValue());
           console.error('[RetroCam] FFmpeg Error Logs:\n', lastLogs);
           if (failStackTrace) console.error('[RetroCam] FFmpeg StackTrace:', failStackTrace);
-          
+
           setFilterFailed(true);
-          // Show the END of the logs where the actual error usually is
           const errorSnippet = lastLogs.length > 500 ? `...${lastLogs.slice(-500)}` : lastLogs;
           Alert.alert(
             'Filter Warning',
@@ -133,7 +127,7 @@ export default function VideoPreviewScreen() {
     };
 
     applyFilter();
-  }, [uri, preset.settings]); // Added preset.settings, removed player (dependency fix)
+  }, []); // Run once on mount — uri and preset are stable from route params
 
   // Cleanup temp files on unmount
   useEffect(() => {
@@ -164,6 +158,11 @@ export default function VideoPreviewScreen() {
       const saved = await saveToGallery(filteredUri);
       if (saved) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Clean up temp file after successful save — no longer needed on disk
+        try {
+          await FileSystem.deleteAsync(filteredUri, { idempotent: true });
+          tempFilesRef.current = tempFilesRef.current.filter(p => p !== filteredUri);
+        } catch { /* noop */ }
         Alert.alert('Saved!', 'Video saved to your gallery');
       } else if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filteredUri, { dialogTitle: 'Save your video' });

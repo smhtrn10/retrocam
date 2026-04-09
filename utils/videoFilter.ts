@@ -1,16 +1,12 @@
 import { CameraSettings } from '@/constants/presets';
 
 /**
- * Builds FFmpeg filter using ONLY universally supported filters
- * in ffmpeg-kit video package:
- * - eq (saturation, contrast, brightness, gamma) ✅
- * - hue (color shift for temperature) ✅  
- * - noise ✅
- * - gblur ✅
- * - vignette ✅
+ * Builds FFmpeg filter using ONLY universally supported filters.
  *
- * Removed risky filters: geq, curves (not in basic video package)
- * Re-added colorchannelmixer (standard in video package)
+ * IMPORTANT: 'eq' filter is NOT available in kroog-ffmpeg-kit-react-native fork.
+ * Replacements:
+ *   - eq(brightness/contrast) → colorlevels
+ *   - eq(saturation)          → hue=s=
  */
 
 function hexToRgb(hex: string) {
@@ -18,68 +14,76 @@ function hexToRgb(hex: string) {
   return result ? {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
+    b: parseInt(result[3], 16),
   } : null;
 }
 
 export function buildVideoFilter(settings: CameraSettings): string {
   const filters: string[] = [];
 
-  // ── 1. eq: saturation + contrast + brightness ──
+  const contrast = Math.max(0.5, Math.min(2.0, settings.contrast));
+  const fade = Math.max(0, Math.min(1, settings.fade));
+
+  // ── 1. colorlevels: contrast + fade (black lift) ──
+  // FIX: clamp rimin to [0, 0.4] — colorlevels does NOT accept negative values
+  if (contrast !== 1.0 || fade > 0.02) {
+    const contrastMargin = Math.max(0, Math.min(0.4, (1 - contrast) * 0.15));
+    const blackLift = Math.max(0, Math.min(0.5, fade * 0.12));
+    const rimin = contrastMargin.toFixed(3);
+    const rimax = Math.min(1.0, 1 - contrastMargin).toFixed(3);
+    const romin = blackLift.toFixed(3);
+    filters.push(
+      `colorlevels=rimin=${rimin}:gimin=${rimin}:bimin=${rimin}` +
+      `:rimax=${rimax}:gimax=${rimax}:bimax=${rimax}` +
+      `:romin=${romin}:gomin=${romin}:bomin=${romin}`
+    );
+  }
+
+  // ── 2. hue: saturation + temperature ──
   const sat = Math.max(0, Math.min(3, settings.saturation));
-  const contrast = Math.max(0.5, Math.min(2, settings.contrast));
-  const brightness = settings.fade > 0.02 ? (settings.fade * 0.08).toFixed(3) : '0';
+  const hasTemp = Math.abs(settings.temperature) > 0.05;
 
-  const gamma = settings.fade > 0.05 ? (1.0 - settings.fade * 0.15).toFixed(3) : '1.0';
+  if (sat !== 1.0 || hasTemp) {
+    const hueShift = hasTemp ? (settings.temperature * 8).toFixed(1) : '0';
+    filters.push(`hue=s=${sat.toFixed(3)}:H=${hueShift}`);
+  }
 
-  filters.push(
-    `eq=saturation=${sat.toFixed(3)}:contrast=${contrast.toFixed(3)}:brightness=${brightness}:gamma=${gamma}`
-  );
+  // ── 3. Tint via colorchannelmixer ──
+  if (settings.tintOpacity > 0.02) {
+    const rgb = hexToRgb(settings.tint);
+    if (rgb) {
+      const a = Math.min(0.25, settings.tintOpacity * 0.25);
+      const rr = (1 - a + a * (rgb.r / 255)).toFixed(4);
+      const gg = (1 - a + a * (rgb.g / 255)).toFixed(4);
+      const bb = (1 - a + a * (rgb.b / 255)).toFixed(4);
+      filters.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`);
+    }
+  }
 
-  // ── 2. Grain ──
+  // ── 4. Grain ──
   if (settings.grain > 0.05) {
-    const strength = Math.round(settings.grain * 20);
+    const strength = Math.min(40, Math.round(settings.grain * 20));
     filters.push(`noise=alls=${strength}:allf=a`);
   }
 
-  // ── 3. Blur ──
+  // ── 5. Blur ──
   if (settings.blur > 0.1) {
-    const sigma = Math.max(0.5, settings.blur * 2.5).toFixed(1);
+    const sigma = Math.max(0.5, Math.min(10, settings.blur * 2.5)).toFixed(1);
     filters.push(`gblur=sigma=${sigma}`);
   }
 
-  // ── 4. Vignette — eval=init for performance (calculated once, not per frame) ──
+  // ── 6. Vignette ──
   if (settings.vignette > 0.05) {
     const angle = Math.min(1.5, settings.vignette * 1.1).toFixed(3);
     filters.push(`vignette=angle=${angle}:eval=init`);
   }
 
-  // ── 5. Color Correction (Temperature + Tint) ──
-  // Using high-compatibility filters (hue, eq) instead of colorchannelmixer (KRİTİK #2)
-  const hasTemp = Math.abs(settings.temperature) > 0.05;
-  const hasTint = settings.tintOpacity > 0.02;
-
-  if (hasTemp) {
-    // hue is safe in all ffmpeg-kit packages
-    const sat = settings.temperature > 0 ? 1 + settings.temperature * 0.3 : 1 + settings.temperature * 0.2;
-    filters.push(`hue=s=${sat.toFixed(3)}`);
-  }
-
-  if (hasTint) {
-    const rgb = hexToRgb(settings.tint);
-    if (rgb) {
-      const a = settings.tintOpacity;
-      // Use eq brightness to simulate tint lifting
-      const br = (a * (rgb.r / 255 - 0.5) * 0.12).toFixed(3);
-      filters.push(`eq=brightness=${br}`);
-    }
-  }
-
-  return filters.join(',') || 'null';
+  return filters.join(',');
 }
 
 /**
  * Returns FFmpeg args as array — safe for executeWithArguments.
+ * If no filters are needed, skips -vf entirely to avoid unnecessary re-encode overhead.
  */
 export function buildFFmpegArgs(
   inputUri: string,
@@ -87,17 +91,26 @@ export function buildFFmpegArgs(
   settings: CameraSettings
 ): string[] {
   const filter = buildVideoFilter(settings);
-  return [
+
+  const baseArgs = [
     '-i', inputUri,
-    '-vf', filter,
-    '-c:v', 'mpeg4',         // Switch to mpeg4 for universal compatibility
-    '-q:v', '5',              // Variable bit rate for mpeg4 (high quality)
+  ];
+
+  // Only add -vf if there are actual filters
+  if (filter) {
+    baseArgs.push('-vf', filter);
+  }
+
+  return [
+    ...baseArgs,
+    '-c:v', 'mpeg4',
+    '-q:v', '5',
     '-pix_fmt', 'yuv420p',
-    '-map', '0:v:0',           // Explicit video stream mapping (stable)
-    '-map', '0:a:0?',          // Map first audio stream OPTIONALLY (prevents crash if silent)
-    '-c:a', 'copy',           // Stream copy for audio (fast/stable)
+    '-map', '0:v:0',
+    '-map', '0:a:0?',
+    '-c:a', 'copy',
     '-movflags', '+faststart',
-    '-f', 'mp4',              // Explicitly set container format
+    '-f', 'mp4',
     '-y',
     outputUri,
   ];
