@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
-  useRef,
 } from 'react-native';
 import { Camera } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
 
 interface Props {
   onContinue: () => void;
@@ -18,7 +18,9 @@ interface Props {
 export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
-  const alreadyGranted = cameraPermission?.granted && micPermission?.granted;
+  const [libraryPermission, requestLibraryPermission] = MediaLibrary.usePermissions();
+  
+  const alreadyGranted = cameraPermission?.granted && micPermission?.granted && libraryPermission?.granted;
   const [granted, setGranted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -42,8 +44,9 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
     try {
       const camResult = await requestCameraPermission();
       const micResult = await requestMicPermission();
+      const libResult = await requestLibraryPermission();
 
-      if (camResult.granted && micResult.granted) {
+      if (camResult.granted && micResult.granted && libResult.granted) {
         setGranted(true);
         Animated.sequence([
           Animated.parallel([
@@ -71,9 +74,9 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
         </View>
       </View>
 
-      <Text style={styles.title}>Camera Access</Text>
+      <Text style={styles.title}>Access Required</Text>
       <Text style={styles.subtitle}>
-        RetroCam needs access to your camera and microphone to capture retro-style photos and videos.
+        RetroCam needs access to your camera, microphone, and gallery to capture and save retro-style photos and videos.
       </Text>
 
       <View style={styles.permissionList}>
@@ -89,6 +92,13 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
           <View>
             <Text style={styles.permTitle}>Microphone</Text>
             <Text style={styles.permDesc}>Record audio with video</Text>
+          </View>
+        </View>
+        <View style={styles.permRow}>
+          <Text style={styles.permIcon}>🖼️</Text>
+          <View>
+            <Text style={styles.permTitle}>Gallery</Text>
+            <Text style={styles.permDesc}>Save & edit your shots</Text>
           </View>
         </View>
       </View>

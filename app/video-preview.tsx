@@ -27,6 +27,17 @@ try {
   console.log('[RetroCam] VideoPreview: FFmpegKit not available (Expo Go)');
 }
 
+// Helper to remove file:// prefix for FFmpeg
+const getSafePath = (uri: string) => {
+  let path = uri;
+  if (path.startsWith('file://')) {
+    path = path.substring(7);
+  }
+  // FFmpeg on Android sometimes needs /data/user/0/... instead of /data/data/...
+  // but Expo's path is usually fine once file:// is removed.
+  return decodeURIComponent(path);
+};
+
 export default function VideoPreviewScreen() {
   const { uri, presetId } = useLocalSearchParams<{ uri: string; presetId: string }>();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,7 +67,12 @@ export default function VideoPreviewScreen() {
       const outputUri = (FileSystem.documentDirectory ?? '') + `retrocam_video_${Date.now()}.mp4`;
 
       try {
-        const args = buildFFmpegArgs(safeUri, outputUri, preset.settings);
+        const inputPath = getSafePath(safeUri);
+        const outputPath = getSafePath(outputUri);
+        
+        const args = buildFFmpegArgs(inputPath, outputPath, preset.settings);
+        console.log('[RetroCam] FFmpeg inputPath:', inputPath);
+        console.log('[RetroCam] FFmpeg outputPath:', outputPath);
         console.log('[RetroCam] FFmpeg args:', args);
 
         // Use array API if available (safer), fallback to string API
@@ -70,26 +86,31 @@ export default function VideoPreviewScreen() {
         console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
 
         if (returnCode?.isValueSuccess()) {
+          // Success: Use the filtered video
           tempFilesRef.current.push(outputUri);
           setFilteredUri(outputUri);
           setFilterApplied(true);
           player.replace(outputUri);
           player.play();
-          console.log('[RetroCam] Filter applied:', outputUri);        } else {
+          console.log('[RetroCam] Filter applied successfully:', outputUri);
+        } else {
+          // Failure: Log detailed output and notify user
           const logs = await session.getLogs();
-          const errMsg = logs?.map((l: any) => l.getMessage()).join('\n') ?? 'Unknown error';
-          console.warn('[RetroCam] FFmpeg failed:', errMsg);
+          const lastLogs = logs?.slice(-10).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
+          console.error('[RetroCam] FFmpeg failed with code:', returnCode?.getValue());
+          console.error('[RetroCam] FFmpeg Error Logs:', lastLogs);
+          
           setFilterFailed(true);
-          // Show user feedback
           Alert.alert(
             'Filter Warning',
-            'Could not apply filter. Original video will be saved.',
+            'Could not apply the cinematic filter. The original video will be saved instead.',
             [{ text: 'OK' }]
           );
         }
-      } catch (e) {
-        console.warn('[RetroCam] FFmpeg error:', e);
+      } catch (e: any) {
+        console.error('[RetroCam] FFmpeg critical error:', e);
         setFilterFailed(true);
+        Alert.alert('Processing Error', 'An error occurred while applying filters.');
       } finally {
         setIsProcessing(false);
       }
