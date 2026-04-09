@@ -115,9 +115,11 @@ export default function VideoPreviewScreen() {
           if (failStackTrace) console.error('[RetroCam] FFmpeg StackTrace:', failStackTrace);
           
           setFilterFailed(true);
+          // Show the END of the logs where the actual error usually is
+          const errorSnippet = lastLogs.length > 500 ? `...${lastLogs.slice(-500)}` : lastLogs;
           Alert.alert(
             'Filter Warning',
-            `Could not apply the cinematic filter. Error:\n\n${lastLogs.substring(0, 300)}...`,
+            `Could not apply the cinematic filter. Details:\n\n${errorSnippet}`,
             [{ text: 'OK' }]
           );
         }

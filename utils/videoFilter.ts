@@ -95,6 +95,7 @@ export function buildFFmpegArgs(
     '-preset', 'ultrafast',
     '-pix_fmt', 'yuv420p',
     '-map', '0:v:0',           // Explicit video stream mapping (stable)
+    '-map', '0:a:0?',          // Map first audio stream OPTIONALLY (prevents crash if silent)
     '-c:a', 'copy',           // Stream copy for audio (fast/stable)
     '-movflags', '+faststart',
     '-f', 'mp4',              // Explicitly set container format
