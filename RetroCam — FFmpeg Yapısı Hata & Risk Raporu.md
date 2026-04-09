@@ -1,25 +1,93 @@
-Dosya	Sorun	Açıklama	Önem	Durum
-videoFilter.ts	geq filtresi — virgül escape hatası	geq=r='r(X-5\,Y)' şeklinde yazılmış. FFmpeg'de \, yanlış; doğrusu geq=r='r(X-5,Y)' ama bu tek tırnak içinde FFmpeg shell'ine string olarak geçince çift escape gerekir. Platform bağımlı crash'e neden olur.	Yüksek	Düzeltilmeli
-videoFilter.ts	noise filtresi flag değeri	allf=t+u bazı FFmpeg sürümlerinde tanınmaz. Güvenli alternatif: allf=t (temporal) veya allf=u (uniform). t+u kombinasyonu dokümanda yoktur.	Yüksek	Düzeltilmeli
-videoFilter.ts	vignette — mode=backward geçersiz	FFmpeg vignette filtresinde mode parametresi yoktur. Geçerli parametreler: angle, x0, y0, aspect, dither, eval. Bu satır filtreyi tamamen hatalı kılar.	Yüksek	Düzeltilmeli
-video-preview.tsx	FFmpeg komutu execute() — argüman sırası	buildFFmpegCommand çıktısı tüm argümanları tek string olarak birleştirir (-i "..." -vf "..."). FFmpegKit.execute() bunu shell üzerinden parse eder; URI'de boşluk veya Türkçe karakter varsa (örn. galeri yolu) argüman parçalanması yaşanır. executeAsync + array API kullanılmalı.	Yüksek	Düzeltilmeli
-Orta seviye riskler
-Dosya	Sorun	Açıklama	Önem	Durum
-video-preview.tsx	Geçici dosya temizlenmez	FFmpeg çıktısı documentDirectory/retrocam_video_*.mp4 olarak yazılır. Paylaş/kaydet sonrası bu dosya silinmez; cihaz depolaması zamanla dolar.	Orta	Risk
-video-preview.tsx	player.replace() dependency eksik	useEffect'te [filteredUri] dinleniyor ancak player dependency array'e eklenmemiş. ESLint react-hooks/exhaustive-deps uyarısı; bazı sürümlerde stale closure ile eski player objesine erişilir.	Orta	Uyarı
-videoFilter.ts	colorchannelmixer renk kanalı çakışması	Tint uygulanırken rg, rb, gr, gb, br, bg çapraz kanalları da ayarlanıyor. Bu değerler toplamı 1'i aşarsa (yüksek tint + parlak renk) çıkış doymuş/yanık görünür. Clamp kontrolü yok.	Orta	Risk
-video-preview.tsx	FFmpeg hata logları sessiz geçiliyor	Başarısız session için getLogs() sadece console.warn'a yazılıyor, kullanıcıya hiçbir geri bildirim verilmiyor. Kullanıcı filtresiz videonun "işlenmiş" göründüğünü zannedebilir.	Orta	Risk
-video.tsx	Timer ref temizliği — race condition	stopRecording içinde timerRef.current temizleniyor fakat startRecording'daki try/catch bloğunda da temizleniyor. İkisi aynı anda çalışırsa (maxDuration bitişi + kullanıcı stop) clearInterval iki kez çağrılabilir — zararsız ama interval ID'nin null olup olmadığı kontrol edilmeli.	Orta	Uyarı
-Düşük öncelikli / yapısal notlar
-Dosya	Sorun	Açıklama	Önem	Durum
-videoFilter.ts	eq filtresi — brightness negatif olamaz	settings.fade değeri 0.02'nin altındaysa brightness '0' yazılıyor, bu doğru. Ama fade negatif değer alabilirse eq=brightness aralığı -1..1 olduğundan sorun yok; yine de negatif fade durumu hiç ele alınmamış.	Düşük	Not
-videoFilter.ts	gblur sigma minimum değeri	Math.max(0.1, ...) ile korunuyor. FFmpeg gblur sigma için 0.1 geçerlidir; ancak çok küçük değerlerde (0.1–0.3) görsel fark yoktur, işlem süresi boşa gider. Threshold 0.3–0.5'e çekilebilir.	Düşük	Not
-video.tsx	effect state kullanılmıyor	effect ve cycleEffect tanımlanmış; görsel overlay var (scanlines, rgb border). Ancak bu efektler FFmpeg pipeline'ına dahil edilmiyor — sadece önizleme overlay'i. Bu kasıtlıysa kod yorumu yoktur; kasıtsızsa eksik özellik.	Düşük	Not
-video-preview.tsx	iOS MediaLibrary çift izin denemesi	İlk saveToLibraryAsync başarısız olursa requestPermissionsAsync çağrılıp tekrar deneniyor. Bu davranış iOS'ta kullanıcıya iki kez izin diyalogu gösterebilir. İzin durumu kayıt öncesi tek seferde kontrol edilmeli.	Düşük	Not
+uygullama video kayıt yapılıyor..kayıt yaptıktan sonra preview kısmı açılıyor..
+ve şu uyarı çıkıyor..
 
-Toplam 4 kritik, 5 orta, 4 düşük sorun tespit edildi. En acil üçü şunlar:
-1. vignette=mode=backward — tamamen geçersiz. FFmpeg'in vignette filtresinde mode parametresi yok, bu satır filtreyi çökertir. Düzeltme basit:
-tsfilters.push(`vignette=angle=${angle}:eval=init`);
-2. noise filtresi allf=t+u — belgelenmemiş kombine flag. FFmpeg kaynak kodunda t ve u ayrı flagler, + ile birleştirmek desteklenmez. Ya allf=t ya allf=u kullanın.
-3. geq escape + FFmpegKit.execute() string API. URI'de boşluk veya özel karakter olursa argüman parçalanır. executeAsync + dizi tabanlı API'ye geçmek daha güvenli:
-tsawait FFmpegKit.executeAsync(['-i', inputUri, '-vf', filter, ...])
+filter warning 
+could not apply the cinematic filter. the orgiinal video will be saved instead diyor ok basıp save butonuna basınca uygulama filtresiz orginal haliyle kayıt alınıyor...
+
+aşağıda bu hatanın çözümü ile ilgili kodlarda ki olabilecek hatalar ve çözüm yollarını açıklıyor.. bunları tektek kontrol et . 
+
+1. analiz et 
+2. tablo oluştur
+3. tabloya göre kodları düzelt
+4. düzeltilmiş kodlar üzerinden bana rapor sun...
+5. sistemi test et ve bana sonucu bildir 
+
+Kritik hatalar — filtre hiç çalışmıyor
+
+libx264 encoder yüklü paket ile eşleşmiyor
+Kodda -c:v libx264 kullanılıyor. Ancak ffmpeg-kit-react-native'in video veya https paketi libx264 içermez. libx264 yalnızca full-gpl veya video-gpl paketlerinde bulunur. Bu tek başına "Unknown encoder libx264" hatasına ve FFmpeg başarısızlığına neden olur.
+Çözüm: Podfile'da subspecs => ['full-gpl'] veya Android'de ffmpegKitPackage = "full-gpl" kullan. Alternatif: -c:v mpeg4 encoder'a geç (libx264 gerektirmez, her pakette çalışır).
+videoFilter.ts
+android/build.gradle
+ios/Podfile
+KRİTİK #2
+colorchannelmixer iki kez uygulanıyor — filtre zinciri kırılıyor
+buildVideoFilter fonksiyonu hem temperature hem de tintOpacity için ayrı colorchannelmixer blokları üretiyor. FFmpeg'de aynı filtre zincirinde iki kez colorchannelmixer yazılırsa ikincisi birincinin çıktısı yerine yanlış akışa bağlanır ve "Invalid option" veya "No such filter" hatasıyla sonuçlanır.
+Çözüm: Temperature ve tint hesaplamalarını tek bir colorchannelmixer bloğuna birleştir: rr=tempR*tintR : gg=tintG : bb=tempB*tintB şeklinde çarp.
+videoFilter.ts › buildVideoFilter()
+KRİTİK #3
+getSafePath çift decode yapıyor — iOS'ta path bozuluyor
+video-preview.tsx'de önce decodeURIComponent(uri) çalışıyor, sonra getSafePath() içinde tekrar decodeURIComponent(path) çağrılıyor. iOS'ta dosya yolu zaten encode edilmiş boşluk veya özel karakter içeriyorsa çift decode, geçersiz path üretiyor ve FFmpeg "No such file or directory" hatasıyla çöküyor.
+Çözüm: getSafePath içindeki decodeURIComponent çağrısını kaldır. Tek bir noktada decode yap, ardından sadece file:// önekini temizle.
+video-preview.tsx › getSafePath()
+Orta öncelikli sorunlar
+ORTA #4
+returnCode.isValueSuccess() yanlış API — ReturnCode.isSuccess() doğrusu
+ffmpeg-kit-react-native'de doğru kullanım ReturnCode.isSuccess(returnCode) şeklinde statik metoddur. Kodda returnCode?.isValueSuccess() çağrılıyor; bu metod mevcut değil veya tanımsız döndürüyor. Bu yüzden başarılı bir işlem bile "başarısız" olarak yorumlanıyor.
+Çözüm: import {'{'} ReturnCode {'}'} from 'ffmpeg-kit-react-native' ekle ve ReturnCode.isSuccess(returnCode) kullan.
+video-preview.tsx › applyFilter()
+ORTA #5
+player.replace() ile useEffect bağımlılığı çakışması
+useVideoPlayer hook'u filteredUri'ye bağlı değil; useEffect içinde player.replace(outputUri) çağrılıyor. Ancak player dependency listede yok. Bu, bazı durumlarda stale closure oluşturur ve video güncellenmez veya eski URI ile oynaya devam eder.
+Çözüm: setFilteredUri(outputUri) yaptıktan sonra player.replace() çağrısını kaldır. useVideoPlayer'ı filteredUri state'ine reaktif yapacak şekilde yeniden yaz.
+video-preview.tsx
+ORTA #6
+FileSystem.getInfoAsync doğrulama path'i tutarsız
+safeUri (decode edilmiş) ile kontrol edilip inputPath (file:// temizlenmiş) ile FFmpeg'e veriliyor. Kontrol başarılı geçse bile yol farklılaşması Android'de "file does not exist" hatasına yol açabiliyor.
+Çözüm: Hem getInfoAsync hem de FFmpeg için aynı normalize edilmiş inputPath değişkenini kullan.
+video-preview.tsx › applyFilter()
+İyileştirme önerileri
+İYİLEŞTİRME #7
+eq filtresi gamma parametresi eksik — görsel fark sınırlı
+eq=saturation=...:contrast=...:brightness=... kullanılıyor ama gamma parametresi eklenmemiş. Özellikle fade etkisi için midtonları lift etmek gerekiyor; gamma olmadan preset görsel farkı zayıf kalıyor.
+Öneri: eq=saturation=X:contrast=Y:brightness=Z:gamma=1.0 şeklinde gamma ekle. Fade için gamma=0.85 midtonları kaldırır.
+videoFilter.ts › buildVideoFilter()
+İYİLEŞTİRME #8
+Ses encode hatası: videosu olmayan stream'lerde -c:a aac çöküyor
+-map 0:a? ile isteğe bağlı ses ekleniyor ama -c:a aac her zaman belirtiliyor. Eğer video sessiz kaydedildiyse bu kombinasyon bazı FFmpeg paketlerinde "Stream specifier" hatasına yol açabilir.
+Öneri: Ses varsa encode et, yoksa atla mantığını şöyle kur: ['-map', '0:v', '-map', '0:a?', '-c:a', 'copy'] ile önce stream copy dene; hata alırsan AAC'ye geç.
+videoFilter.ts › buildFFmpegArgs()
+
+KRİTİK #1 — Kök neden: libx264 pakette yok
+Bu muhtemelen tek başına tüm filtrenin çalışmamasının sebebi. Kodda -c:v libx264 yazıyor ama libx264 H.264 encoder'ı kullanmak için full-gpl konfigürasyonu gerekiyor Heliverse. video veya https subspec'i bunu içermiyor.
+İki seçeneğin var:
+Seçenek A — Paketi yükselt:
+gradle// android/build.gradle
+ext {
+  ffmpegKitPackage = "full-gpl"
+}
+ruby# ios/Podfile
+pod 'ffmpeg-kit-react-native', :subspecs => ['full-gpl'],
+  :podspec => '../node_modules/ffmpeg-kit-react-native/ffmpeg-kit-react-native.podspec'
+Seçenek B — Encoder'ı değiştir (daha hızlı çözüm, her pakette çalışır):
+typescript// videoFilter.ts → buildFFmpegArgs içinde
+'-c:v', 'mpeg4',   // libx264 yerine
+
+KRİTİK #2 — ReturnCode API yanlış kullanımı
+video-preview.tsx'de şu satır:
+typescriptif (returnCode?.isValueSuccess()) {  // ❌ bu method yok
+şöyle olmalı:
+typescriptimport { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
+// ...
+if (ReturnCode.isSuccess(returnCode)) {  // ✅
+Bu hata yüzünden FFmpeg başarılı olsa bile "başarısız" sayılıyor olabilir.
+
+KRİTİK #3 — Double colorchannelmixer
+videoFilter.ts'de hem temperature hem de tint ayrı ayrı colorchannelmixer yazıyor. İkisini birleştirmen gerekiyor:
+typescript// Tek bir colorchannelmixer bloğu:
+const rr = ((1 + t * 0.12) * (1 - a + a * rgb.r / 255)).toFixed(3);
+const gg = (1 - a + a * rgb.g / 255).toFixed(3);
+const bb = ((1 - t * 0.12) * (1 - a + a * rgb.b / 255)).toFixed(3);
+filters.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`);
+
+En hızlı test için önce #1 (encoder değiştir) + #2 (ReturnCode API) düzeltmelerini yap.
