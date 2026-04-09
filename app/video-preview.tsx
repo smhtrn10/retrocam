@@ -75,14 +75,18 @@ export default function VideoPreviewScreen() {
         console.log('[RetroCam] FFmpeg outputPath:', outputPath);
         console.log('[RetroCam] FFmpeg args:', args);
 
-        // Use array API if available (safer), fallback to string API
-        let session;
-        if (typeof FFmpegKit.executeWithArguments === 'function') {
-          session = await FFmpegKit.executeWithArguments(args);
-        } else {
-          session = await FFmpegKit.execute(args.join(' '));
+        // Ensure input exists and output is ready
+        const inputExists = await FileSystem.getInfoAsync(safeUri);
+        if (!inputExists.exists) {
+          throw new Error(`Input file does not exist: ${inputPath}`);
         }
+
+        console.log('[RetroCam] Starting FFmpeg with args:', args.join(' '));
+
+        const session = await FFmpegKit.executeWithArguments(args);
         const returnCode = await session.getReturnCode();
+        const failStackTrace = await session.getFailStackTrace();
+        
         console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
 
         if (returnCode?.isValueSuccess()) {
@@ -96,9 +100,11 @@ export default function VideoPreviewScreen() {
         } else {
           // Failure: Log detailed output and notify user
           const logs = await session.getLogs();
-          const lastLogs = logs?.slice(-10).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
+          const lastLogs = logs?.slice(-15).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
+          
           console.error('[RetroCam] FFmpeg failed with code:', returnCode?.getValue());
-          console.error('[RetroCam] FFmpeg Error Logs:', lastLogs);
+          console.error('[RetroCam] FFmpeg Error Logs:\n', lastLogs);
+          if (failStackTrace) console.error('[RetroCam] FFmpeg StackTrace:', failStackTrace);
           
           setFilterFailed(true);
           Alert.alert(

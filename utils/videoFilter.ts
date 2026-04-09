@@ -9,8 +9,19 @@ import { CameraSettings } from '@/constants/presets';
  * - gblur ✅
  * - vignette ✅
  *
- * Removed risky filters: geq, curves, colorchannelmixer (not in video package)
+ * Removed risky filters: geq, curves (not in basic video package)
+ * Re-added colorchannelmixer (standard in video package)
  */
+
+function hexToRgb(hex: string) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
 export function buildVideoFilter(settings: CameraSettings): string {
   const filters: string[] = [];
 
@@ -41,6 +52,28 @@ export function buildVideoFilter(settings: CameraSettings): string {
     filters.push(`vignette=angle=${angle}:eval=init`);
   }
 
+  // ── 5. Temperature (Color Balance) ──
+  if (Math.abs(settings.temperature) > 0.05) {
+    const t = settings.temperature;
+    // Positive = Warm (Red up, Blue down), Negative = Cool (Blue up, Red down)
+    const rGain = (1 + t * 0.12).toFixed(3);
+    const bGain = (1 - t * 0.12).toFixed(3);
+    filters.push(`colorchannelmixer=rr=${rGain}:bb=${bGain}`);
+  }
+
+  // ── 6. Tint (Color Overlay) ──
+  if (settings.tintOpacity > 0.02) {
+    const rgb = hexToRgb(settings.tint);
+    if (rgb) {
+      const a = settings.tintOpacity;
+      // Simulate "Overlay" / "Color" blend mode via channel gains
+      const rr = (1 - a + a * (rgb.r / 255)).toFixed(3);
+      const gg = (1 - a + a * (rgb.g / 255)).toFixed(3);
+      const bb = (1 - a + a * (rgb.b / 255)).toFixed(3);
+      filters.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`);
+    }
+  }
+
   return filters.join(',') || 'null';
 }
 
@@ -57,8 +90,12 @@ export function buildFFmpegArgs(
     '-i', inputUri,
     '-vf', filter,
     '-c:v', 'libx264',
+    '-preset', 'ultrafast', // Crucial for mobile performance/stability
     '-crf', '23',
-    '-c:a', 'copy',
+    '-pix_fmt', 'yuv420p',   // Ensure compatibility with all players
+    '-map', '0:v',           // Map video stream
+    '-map', '0:a?',          // Map audio ONLY IF it exists (prevents failure)
+    '-c:a', 'aac',           // Re-encode to AAC for stability
     '-movflags', '+faststart',
     '-y',
     outputUri,
