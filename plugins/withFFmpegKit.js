@@ -51,7 +51,7 @@ const withFFmpegKitIos = (config) => {
     if (!contents.includes('ffmpeg-kit-ios-full-gpl')) {
       contents = contents.replace(
         /^(target\s+['"].*['"]\s+do)/m,
-        `$1\n  pod 'ffmpeg-kit-ios-full-gpl', :podspec => './ffmpeg-kit-ios-full-gpl.podspec'\n  pod 'ffmpeg-kit-react-native', :podspec => '../node_modules/ffmpeg-kit-react-native/kroog-ffmpeg-kit-react-native.podspec'`
+        `$1\n  pod 'ffmpeg-kit-ios-full-gpl', :podspec => './ffmpeg-kit-ios-full-gpl.podspec'`
       );
     }
 
