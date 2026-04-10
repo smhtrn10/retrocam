@@ -34,7 +34,7 @@
         "expo-system-ui": "~6.0.9",
         "expo-video": "~3.0.16",
         "expo-web-browser": "~15.0.10",
-        "ffmpeg-kit-react-native": "npm:kroog-ffmpeg-kit-react-native@^6.0.10",
+        "ffmpeg-kit-react-native": "npm:ffmpeg-rn@^1.0.11",
         "i18next": "^26.0.3",
         "lucide-react-native": "^0.475.0",
         "react": "19.1.0",
@@ -1024,7 +1024,7 @@
 
     "fdir": ["fdir@6.4.6", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-hiFoqpyZcfNm1yc4u8oWCf9A2c4D3QjCrks3zmoVKVxpQRzmPNar1hUJcBG2RQHvEVGDN+Jm81ZheVLAQMK6+w=="],
 
-    "ffmpeg-kit-react-native": ["kroog-ffmpeg-kit-react-native@6.0.10", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-W8FtwEqg2YAQof4ISt772vF3xJsKInP55DxY5O9/dtRY32++X+86QvnXFVATils3zVw/kAfPh4ecapugPzqwEw=="],
+    "ffmpeg-kit-react-native": ["ffmpeg-rn@1.0.11", "", { "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-LJwLMpX4gZBkgvEWty73ww18hRMYLXVATbNAOX668F8hoyGHvHeh7SYErNMyGz+KtzLXDC/EbvneQ7H3AU9lSw=="],
 
     "file-entry-cache": ["file-entry-cache@8.0.0", "", { "dependencies": { "flat-cache": "^4.0.0" } }, "sha512-XXTUwCvisa5oacNGRP9SfNtYBNAMi+RPwBFmblZEF7N7swHYQS6/Zfk7SRwx4D5j3CH211YNRco1DEMNVfZCnQ=="],
 
