@@ -46,7 +46,10 @@ export default function VideoPreviewScreen() {
   const [filteredUri, setFilteredUri] = useState<string>(uri);
   const [filterApplied, setFilterApplied] = useState(false);
   const [filterFailed, setFilterFailed] = useState(false);
-  
+
+  // Always holds the latest filteredUri — avoids stale closure in useCallback
+  const filteredUriRef = useRef<string>(uri);
+
   // Track temp files for cleanup
   const tempFilesRef = useRef<string[]>([]);
   const preset = CAMERA_PRESETS.find(p => p.id === presetId) ?? CAMERA_PRESETS[0];
@@ -98,6 +101,7 @@ export default function VideoPreviewScreen() {
         if (ReturnCode && ReturnCode.isSuccess(returnCode)) {
           console.log('[RetroCam] Filter applied successfully:', outputUri);
           tempFilesRef.current.push(outputUri);
+          filteredUriRef.current = outputUri; // update ref immediately — safe for callbacks
           setFilteredUri(outputUri);
           setFilterApplied(true);
         } else {
@@ -152,20 +156,21 @@ export default function VideoPreviewScreen() {
   }, []);
 
   const handleSave = useCallback(async () => {
+    const uriToSave = filteredUriRef.current; // always the latest — never stale
     setIsSaving(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const saved = await saveToGallery(filteredUri);
+      const saved = await saveToGallery(uriToSave);
       if (saved) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Clean up temp file after successful save — no longer needed on disk
+        // Clean up temp file after successful save
         try {
-          await FileSystem.deleteAsync(filteredUri, { idempotent: true });
-          tempFilesRef.current = tempFilesRef.current.filter(p => p !== filteredUri);
+          await FileSystem.deleteAsync(uriToSave, { idempotent: true });
+          tempFilesRef.current = tempFilesRef.current.filter(p => p !== uriToSave);
         } catch { /* noop */ }
         Alert.alert('Saved!', 'Video saved to your gallery');
       } else if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(filteredUri, { dialogTitle: 'Save your video' });
+        await Sharing.shareAsync(uriToSave, { dialogTitle: 'Save your video' });
       } else {
         Alert.alert('Error', 'Could not save video.');
       }
@@ -175,17 +180,18 @@ export default function VideoPreviewScreen() {
     } finally {
       setIsSaving(false);
     }
-  }, [filteredUri, saveToGallery]);
+  }, [saveToGallery]); // no filteredUri dep needed — reading from ref
 
   const handleShare = useCallback(async () => {
+    const uriToShare = filteredUriRef.current; // always the latest
     setIsSharing(true);
     try {
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(filteredUri, { mimeType: 'video/mp4' });
+        await Sharing.shareAsync(uriToShare, { mimeType: 'video/mp4' });
       }
     } catch { /* noop */ }
     finally { setIsSharing(false); }
-  }, [filteredUri]);
+  }, []);
 
   const statusBadge = () => {
     if (!FFmpegKit) return <Text style={styles.badgeWarn}>Preview Only (Expo Go)</Text>;

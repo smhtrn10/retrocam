@@ -80,6 +80,15 @@
       "expo-localization",
       "expo-video",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 1284,
+          "resizeMode": "cover",
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
         "@config-plugins/ffmpeg-kit-react-native",
         {
           "package": "full-gpl"
