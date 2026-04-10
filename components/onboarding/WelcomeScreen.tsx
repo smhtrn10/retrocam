@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Play } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,9 +49,11 @@ export const WelcomeScreen: React.FC<Props> = ({ onContinue, title, subtitle, bu
       {/* Hero Visual */}
       <View style={styles.heroSection}>
         <Animated.View style={{ opacity: opacityAnim, transform: [{ scale: scaleAnim }] }}>
-           <View style={styles.cameraIconContainer}>
-             <Camera size={72} color="#FFD166" />
-           </View>
+           <Image
+             source={require('@/assets/images/caracter.png')}
+             style={styles.splashImage}
+             resizeMode="contain"
+           />
         </Animated.View>
 
         {/* Floating elements can be placed around here */}
@@ -87,15 +89,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cameraIconContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 209, 102, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 209, 102, 0.3)',
+  splashImage: {
+    width: 220,
+    height: 220,
   },
   contentSection: {
     flex: 0.45,

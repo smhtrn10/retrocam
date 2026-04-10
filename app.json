@@ -42,6 +42,7 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
+      "./plugins/withFFmpegKit",
       [
         "expo-router",
         {
@@ -51,8 +52,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "RetroCam accesses your photo library so you can select existing photos and apply retro filters to them.",
-          "savePhotosPermission": "RetroCam saves your edited retro-style photos and videos directly to your photo library.",
+          "photosPermission": "RetroCam needs access to your photo library so you can select existing photos and apply retro film filters to them. The app lets you choose any photo from your library and transform it with vintage looks such as Kodak Gold, Fuji Superia, Polaroid, Super 8, and VHS effects. Without this permission, you will only be able to use the live camera to capture new photos.",
+          "savePhotosPermission": "RetroCam needs permission to save your edited photos and videos directly to your photo library. After applying a retro filter, the app saves the final result to your gallery so you can share or keep it. Without this permission, your edited content cannot be saved to your device.",
           "granularPermissions": [
             "photo",
             "video",
@@ -63,15 +64,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "RetroCam uses your camera to capture photos and apply retro-style filters in real time. For example, you can shoot a photo and instantly see it transformed with a vintage film look.",
-          "microphonePermission": "RetroCam uses the microphone to record audio while capturing retro-style video clips. For example, when you record a video, the microphone captures sound so your clip includes audio."
+          "cameraPermission": "RetroCam uses your camera to capture photos and videos and apply vintage film filters in real time — such as Kodak Gold 200, Polaroid, Super 8, and VHS looks — directly through the viewfinder as you shoot. For example, when you take a photo, the app instantly processes it with grain, color grading, and light leak effects on your device. All captured content is processed locally and is never uploaded to any server.",
+          "microphonePermission": "RetroCam uses your microphone exclusively to record audio while you capture retro-style video clips. For example, when you record a video with the VHS or Super 8 filter, the microphone captures ambient sound so your clip includes audio alongside the visual effect. Audio is recorded and stored only on your device and is never transmitted to any server."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "RetroCam accesses your photo library so you can select existing photos and apply retro filters to them.",
-          "cameraPermission": "RetroCam uses your camera to capture photos and apply retro-style filters in real time."
+          "photosPermission": "RetroCam needs access to your photo library so you can select existing photos and apply retro film filters to them. The app lets you choose any photo from your library and transform it with vintage looks such as Kodak Gold, Fuji Superia, Polaroid, Super 8, and VHS effects. Without this permission, you will only be able to use the live camera to capture new photos."
         }
       ],
 
@@ -86,12 +86,6 @@
           "imageWidth": 1284,
           "resizeMode": "cover",
           "backgroundColor": "#000000"
-        }
-      ],
-      [
-        "@config-plugins/ffmpeg-kit-react-native",
-        {
-          "package": "full-gpl"
         }
       ]
     ],
