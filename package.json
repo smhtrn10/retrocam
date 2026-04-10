@@ -39,7 +39,7 @@
     "expo-system-ui": "~6.0.9",
     "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.10",
-    "ffmpeg-kit-react-native": "npm:ffmpeg-rn@^1.0.11",
+    "ffmpeg-kit-react-native": "github:jdarshan5/ffmpeg-kit-react-native",
     "i18next": "^26.0.3",
     "lucide-react-native": "^0.475.0",
     "react": "19.1.0",
