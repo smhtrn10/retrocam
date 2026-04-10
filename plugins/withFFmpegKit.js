@@ -51,7 +51,7 @@ const withFFmpegKitIos = (config) => {
     if (!contents.includes('ffmpeg-kit-ios-full-gpl')) {
       contents = contents.replace(
         /^(target\s+['"].*['"]\s+do)/m,
-        `$1\n  pod 'ffmpeg-kit-ios-full-gpl', :podspec => './ffmpeg-kit-ios-full-gpl.podspec'`
+        `$1\n  pod 'ffmpeg-kit-ios-full-gpl', :podspec => 'file://' + File.join(__dir__, 'ffmpeg-kit-ios-full-gpl.podspec')`
       );
     }
 

@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
   s.name         = 'ffmpeg-kit-ios-full-gpl'
   s.version      = '6.0'
-  s.summary      = 'FFmpegKit iOS full-gpl with React Native bridge'
+  s.summary      = 'FFmpegKit iOS full-gpl xcframeworks'
   s.homepage     = 'https://github.com/semihtrn4/ffmpeg-kit-ios-full-gpl'
   s.license      = { :type => 'LGPL' }
   s.author       = { 'semihtrn4' => '' }
@@ -20,9 +20,4 @@ Pod::Spec.new do |s|
     'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/libavcodec.xcframework',
     'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc/ffmpegkit.xcframework'
   ]
-
-  s.dependency 'React-Core'
-
-  s.source_files = '../node_modules/ffmpeg-kit-react-native/ios/FFmpegKitReactNativeModule.m',
-                   '../node_modules/ffmpeg-kit-react-native/ios/FFmpegKitReactNativeModule.h'
 end
