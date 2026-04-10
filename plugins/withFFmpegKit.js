@@ -1,16 +1,24 @@
-const { withAppBuildGradle, withPodfile, withDangerousMod } = require('@expo/config-plugins');
+const { withAppBuildGradle, withProjectBuildGradle, withPodfile, withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-// Android: inject ffmpegKitPackage into build.gradle
+// Android: inject ffmpegKitPackage into ROOT build.gradle ext block
 const withFFmpegKitAndroid = (config) => {
-  return withAppBuildGradle(config, (cfg) => {
+  return withProjectBuildGradle(config, (cfg) => {
     const gradle = cfg.modResults.contents;
     if (!gradle.includes('ffmpegKitPackage')) {
-      cfg.modResults.contents = gradle.replace(
-        /android\s*\{/,
-        `android {\n    defaultConfig {\n        buildConfigField "String", "ffmpegKitPackage", "\\"video\\""\n    }`
-      );
+      // inject into ext block if exists, otherwise add one
+      if (gradle.includes('ext {')) {
+        cfg.modResults.contents = gradle.replace(
+          /ext\s*\{/,
+          `ext {\n        ffmpegKitPackage = "video"`
+        );
+      } else {
+        cfg.modResults.contents = gradle.replace(
+          /^(allprojects|buildscript)/m,
+          `ext {\n    ffmpegKitPackage = "video"\n}\n\n$1`
+        );
+      }
     }
     return cfg;
   });
