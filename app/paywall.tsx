@@ -13,7 +13,7 @@ const isTablet = width > 768;
 export default function PaywallScreen() {
   const { t } = useTranslation();
   const { purchasePackage, simulateDevPurchase, restorePurchases, packages, isLoading, isPro } = usePurchases();
-  
+
   const [showCloseButton, setShowCloseButton] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
@@ -23,7 +23,6 @@ export default function PaywallScreen() {
   }, [isPro]);
 
   useEffect(() => {
-    // FTC compliance: 7 second close button logic
     const timer = setTimeout(() => setShowCloseButton(true), 7000);
     return () => clearTimeout(timer);
   }, []);
@@ -39,7 +38,7 @@ export default function PaywallScreen() {
 
   const handlePurchase = useCallback(async () => {
     const pkg = packages.find(p => p.identifier === selectedPackage);
-    
+
     if (!pkg && __DEV__) {
       setIsPurchasing(true);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -47,7 +46,7 @@ export default function PaywallScreen() {
       setIsPurchasing(false);
       return;
     }
-    
+
     if (!pkg) {
       Alert.alert(t('common.error', 'Error'), t('paywall.package_not_found', 'Package not found.'));
       return;
@@ -72,9 +71,16 @@ export default function PaywallScreen() {
     }
   }, [restorePurchases]);
 
+  const selectedPkg = packages.find(p => p.identifier === selectedPackage);
+  const isAnnualSelected = selectedPkg?.packageType === 'ANNUAL';
+
+  const getButtonLabel = () => {
+    if (isAnnualSelected) return t('paywall.trial', 'Try Free for 3 Days');
+    return t('onboarding.continue', 'Continue');
+  };
+
   const getTrialDisclaimer = () => {
-    const pkg = packages.find(p => p.identifier === selectedPackage);
-    if (pkg?.packageType === 'ANNUAL') {
+    if (isAnnualSelected) {
       return t('paywall.trial_disclaimer', '3-day free trial. Renews automatically unless cancelled.');
     }
     return '';
@@ -85,7 +91,7 @@ export default function PaywallScreen() {
     t('paywall.benefit_2', 'Infinite resolution export'),
     t('paywall.benefit_3', 'No ads, no watermarks'),
     t('paywall.benefit_4', 'Priority AI processing'),
-    t('paywall.benefit_5', 'Exclusive golden hour features')
+    t('paywall.benefit_5', 'Exclusive golden hour features'),
   ], [t]);
 
   return (
@@ -118,60 +124,85 @@ export default function PaywallScreen() {
           ))}
         </View>
 
+        {/* Plan cards */}
         <View style={styles.plansWrap}>
-          {packages.map((pkg) => {
-            const isSelected = selectedPackage === pkg.identifier;
-            const isAnnual = pkg.packageType === 'ANNUAL';
-            const price = pkg.product.priceString;
-            
-            let periodText = t('paywall.monthly', 'Monthly');
-            if (isAnnual) periodText = t('paywall.yearly', 'Yearly');
-            else if (pkg.packageType === 'WEEKLY') periodText = t('paywall.weekly', 'Weekly');
+          {isLoading && packages.length === 0 ? (
+            <ActivityIndicator color="#FFD166" style={{ marginVertical: 20 }} />
+          ) : (
+            packages.map((pkg) => {
+              const isSelected = selectedPackage === pkg.identifier;
+              const isAnnual = pkg.packageType === 'ANNUAL';
+              const price = pkg.product.priceString;
 
-            return (
-              <TouchableOpacity
-                key={pkg.identifier}
-                style={[styles.planCard, isSelected && styles.planCardActive]}
-                onPress={() => setSelectedPackage(pkg.identifier)}
-                activeOpacity={0.9}
-              >
-                {isAnnual && (
-                  <View style={styles.bestValueBadge}>
-                    <Text style={styles.bestValueText}>{t('paywall.best_value', 'Best Value')}</Text>
+              let periodLabel = t('paywall.monthly', 'Monthly');
+              if (isAnnual) periodLabel = t('paywall.yearly', 'Yearly');
+              else if (pkg.packageType === 'WEEKLY') periodLabel = t('paywall.weekly', 'Weekly');
+
+              return (
+                <TouchableOpacity
+                  key={pkg.identifier}
+                  style={[styles.planCard, isSelected && styles.planCardActive]}
+                  onPress={() => setSelectedPackage(pkg.identifier)}
+                  activeOpacity={0.9}
+                >
+                  {/* Best value badge */}
+                  {isAnnual && (
+                    <View style={styles.bestValueBadge}>
+                      <Text style={styles.bestValueText}>{t('paywall.best_value', 'Best Value')}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.planInfo}>
+                    <View style={styles.planLabelRow}>
+                      <Text style={[styles.planPeriod, isSelected && styles.planPeriodActive]}>
+                        {periodLabel}
+                      </Text>
+                      {/* Trial badge — only on annual */}
+                      {isAnnual && (
+                        <View style={styles.trialBadge}>
+                          <Text style={styles.trialBadgeText}>
+                            {t('paywall.trial_badge', '3-Day Free Trial')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.planPrice, isSelected && styles.planPriceActive]}>
+                      {price}
+                    </Text>
+                    {/* "then price/year" hint under annual */}
+                    {isAnnual && (
+                      <Text style={styles.trialThenText}>
+                        {t('paywall.trial_then', 'then {{price}}/year', { price })}
+                      </Text>
+                    )}
                   </View>
-                )}
-                
-                <View style={styles.planInfo}>
-                  <Text style={[styles.planPeriod, isSelected && styles.planPeriodActive]}>{periodText}</Text>
-                  <Text style={[styles.planPrice, isSelected && styles.planPriceActive]}>{price}</Text>
-                </View>
 
-                <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-                  {isSelected && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            )
-          })}
+                  <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
+                    {isSelected && <View style={styles.radioInner} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
 
+        {/* CTA */}
         <View style={styles.ctaWrapper}>
-          <TouchableOpacity 
-            style={[styles.subscribeBtn, (isPurchasing || isLoading) && styles.subscribeBtnDisabled]} 
+          <TouchableOpacity
+            style={[styles.subscribeBtn, (isPurchasing || isLoading) && styles.subscribeBtnDisabled]}
             onPress={handlePurchase}
             disabled={isPurchasing || isLoading || !selectedPackage}
           >
             {isPurchasing || isLoading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.subscribeBtnText}>
-                {packages.find(p => p.identifier === selectedPackage)?.packageType === 'ANNUAL' 
-                  ? t('paywall.trial', 'Start 3-Day Free Trial') 
-                  : t('onboarding.continue', 'Continue')}
-              </Text>
+              <Text style={styles.subscribeBtnText}>{getButtonLabel()}</Text>
             )}
           </TouchableOpacity>
-          
-          <Text style={styles.disclaimerText}>{getTrialDisclaimer()}</Text>
+
+          {getTrialDisclaimer() !== '' && (
+            <Text style={styles.disclaimerText}>{getTrialDisclaimer()}</Text>
+          )}
         </View>
 
         <View style={styles.footerLinks}>
@@ -187,7 +218,6 @@ export default function PaywallScreen() {
             <Text style={styles.legalLink}>{t('paywall.restore', 'Restore')}</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -208,7 +238,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center', alignItems: 'center'
+    justifyContent: 'center', alignItems: 'center',
   },
   closeBtnPlaceholder: {
     width: 40, height: 40,
@@ -220,7 +250,7 @@ const styles = StyleSheet.create({
   tabletContent: {
     maxWidth: 680,
     alignSelf: 'center',
-    width: '100%'
+    width: '100%',
   },
   heroBox: {
     alignItems: 'center',
@@ -251,7 +281,7 @@ const styles = StyleSheet.create({
     width: 28, height: 28,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 209, 102, 0.1)',
-    justifyContent: 'center', alignItems: 'center'
+    justifyContent: 'center', alignItems: 'center',
   },
   benefitText: {
     color: '#FFF',
@@ -269,9 +299,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderWidth: 2,
     borderColor: '#333',
-    padding: 24,
+    padding: 20,
     borderRadius: 24,
-    position: 'relative'
+    position: 'relative',
   },
   planCardActive: {
     borderColor: '#FFD166',
@@ -297,6 +327,12 @@ const styles = StyleSheet.create({
   planInfo: {
     flex: 1,
   },
+  planLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   planPeriod: {
     color: '#FFF',
     fontSize: 18,
@@ -304,6 +340,19 @@ const styles = StyleSheet.create({
   },
   planPeriodActive: {
     color: '#FFD166',
+  },
+  trialBadge: {
+    backgroundColor: 'rgba(255,209,102,0.15)',
+    borderWidth: 1,
+    borderColor: '#FFD166',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  trialBadgeText: {
+    color: '#FFD166',
+    fontSize: 11,
+    fontWeight: '700',
   },
   planPrice: {
     color: 'rgba(255,255,255,0.5)',
@@ -313,12 +362,17 @@ const styles = StyleSheet.create({
   planPriceActive: {
     color: '#FFF',
   },
+  trialThenText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 11,
+    marginTop: 2,
+  },
   radioOuter: {
     width: 24, height: 24,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center', alignItems: 'center'
+    justifyContent: 'center', alignItems: 'center',
   },
   radioOuterActive: {
     borderColor: '#FFD166',
@@ -326,7 +380,7 @@ const styles = StyleSheet.create({
   radioInner: {
     width: 12, height: 12,
     borderRadius: 6,
-    backgroundColor: '#FFD166'
+    backgroundColor: '#FFD166',
   },
   ctaWrapper: {
     alignItems: 'center',
@@ -367,5 +421,5 @@ const styles = StyleSheet.create({
   legalSep: {
     color: 'rgba(255,255,255,0.2)',
     fontSize: 12,
-  }
+  },
 });
