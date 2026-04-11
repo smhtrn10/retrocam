@@ -1,4 +1,6 @@
-const { withProjectBuildGradle, withPodfile } = require('@expo/config-plugins');
+const { withProjectBuildGradle, withPodfile, withDangerousMod } = require('@expo/config-plugins');
+const path = require('path');
+const fs = require('fs');
 
 // Android: inject ffmpegKitPackage = "full-gpl" into ROOT build.gradle ext block
 // The jdarshan5 package's build.gradle reads this and downloads the correct AAR from Maven Central
@@ -20,6 +22,28 @@ const withFFmpegKitAndroid = (config) => {
     }
     return cfg;
   });
+};
+
+// Patch the ffmpeg-kit-react-native gradle.properties to use 6.0.1
+// which is the last version actually published to Maven Central
+const withFFmpegKitVersionPatch = (config) => {
+  return withDangerousMod(config, [
+    'android',
+    (cfg) => {
+      const gradlePropsPath = path.join(
+        cfg.modRequest.projectRoot,
+        'node_modules/ffmpeg-kit-react-native/android/gradle.properties'
+      );
+      if (fs.existsSync(gradlePropsPath)) {
+        let contents = fs.readFileSync(gradlePropsPath, 'utf8');
+        contents = contents
+          .replace(/ffmpegKit\.android\.main\.version=.*/g, 'ffmpegKit.android.main.version=6.0.1')
+          .replace(/ffmpegKit\.android\.lts\.version=.*/g, 'ffmpegKit.android.lts.version=6.0.1');
+        fs.writeFileSync(gradlePropsPath, contents, 'utf8');
+      }
+      return cfg;
+    },
+  ]);
 };
 
 // iOS: patch Podfile to use jdarshan5's local podspecs
@@ -51,6 +75,7 @@ const withFFmpegKitIos = (config) => {
 
 module.exports = (config) => {
   config = withFFmpegKitAndroid(config);
+  config = withFFmpegKitVersionPatch(config);
   config = withFFmpegKitIos(config);
   return config;
 };
