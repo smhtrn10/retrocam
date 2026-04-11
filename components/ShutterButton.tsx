@@ -5,11 +5,16 @@ import * as Haptics from 'expo-haptics';
 interface ShutterButtonProps {
   onPress: () => void;
   disabled?: boolean;
+  scale?: number;
 }
 
-export function ShutterButton({ onPress, disabled }: ShutterButtonProps) {
+export function ShutterButton({ onPress, disabled, scale: baseScale = 1 }: ShutterButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const innerScale = useRef(new Animated.Value(1)).current;
+
+  const SIZE = 80 * baseScale;
+  const MIDDLE_SIZE = 68 * baseScale;
+  const INNER_SIZE = 58 * baseScale;
 
   const handlePressIn = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -39,10 +44,34 @@ export function ShutterButton({ onPress, disabled }: ShutterButtonProps) {
       disabled={disabled}
       style={styles.hitArea}
     >
-      <Animated.View style={[styles.outerRing, { transform: [{ scale }], opacity: disabled ? 0.4 : 1 }]}>
+      <Animated.View style={[
+        styles.outerRing,
+        {
+          width: SIZE,
+          height: SIZE,
+          borderRadius: SIZE / 2,
+          transform: [{ scale }],
+          opacity: disabled ? 0.4 : 1
+        }
+      ]}>
         {/* Outer decorative ring */}
-        <View style={styles.middleRing}>
-          <Animated.View style={[styles.innerCircle, { transform: [{ scale: innerScale }] }]} />
+        <View style={[
+          styles.middleRing,
+          {
+            width: MIDDLE_SIZE,
+            height: MIDDLE_SIZE,
+            borderRadius: MIDDLE_SIZE / 2,
+          }
+        ]}>
+          <Animated.View style={[
+            styles.innerCircle,
+            {
+              width: INNER_SIZE,
+              height: INNER_SIZE,
+              borderRadius: INNER_SIZE / 2,
+              transform: [{ scale: innerScale }]
+            }
+          ]} />
         </View>
       </Animated.View>
     </Pressable>
@@ -56,9 +85,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outerRing: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
@@ -66,18 +92,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   middleRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   innerCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
     backgroundColor: '#FFFFFF',
   },
 });

@@ -1,0 +1,90 @@
+═════════════════════════════════════════════════════════════════
+  expo-app — iOS Build Uyumluluk Raporu
+  Expo SDK 54  |  RN 0.81.5  |  React 19.1.0
+  11.04.2026 23:08:14
+═════════════════════════════════════════════════════════════════
+
+  Sistem Bilgisi
+  Node      : 24.11.0
+  npm       : 11.6.1
+  CocoaPods : tespit edilemedi
+  Xcode     : tespit edilemedi
+
+─────────────────────────────────────────────────────────────────
+  SISTEM
+─────────────────────────────────────────────────────────────────
+  ✅ Node.js >= 20.0
+  ✅ npm >= 10.0
+  ❌ CocoaPods >= 1.15
+       → yok — min 1.15.0 gerekli
+       ℹ  Güncelle: sudo gem install cocoapods
+  ⚠️  Xcode >= 16.0
+       → Xcode tespit edilemedi — min 16.0 öneriliyor
+       ℹ  App Store Connect yüklemeleri için Xcode 16+ zorunlu
+
+─────────────────────────────────────────────────────────────────
+  RN UYUMU
+─────────────────────────────────────────────────────────────────
+  ✅ react-native 0.81.x (SDK 54)
+  ✅ react 19.x
+  ✅ expo-router 6.x (SDK 54)
+  ⚠️  react-i18next 17.x + React 19
+       → react-i18next 17.x React 19 ile henüz tam test edilmemiş
+       ℹ  Runtime'da context/hook hatası çıkabilir. GitHub issues'ı takip et.
+
+─────────────────────────────────────────────────────────────────
+  NATIVE PAKETLER
+─────────────────────────────────────────────────────────────────
+  ❌ ffmpeg-kit — GitHub fork (KRİTİK)
+       → Resmi npm yerine GitHub fork: github:jdarshan5/ffmpeg-kit-react-native
+       ℹ  Bu fork RN 0.81 + iOS 17 ile test edilmiş mi bilinmiyor. Podfile'da pod sürümünü elle kontrol et. ios/ klasöründe: cat ios/Podfile | grep -i ffmpeg
+  ⚠️  ffmpeg-kit — iOS framework boyutu
+       → Tam ffmpeg paketi ~200 MB — EAS Build süre aşımı riski
+       ℹ  Sadece ihtiyacın olan codec'i seç. Podfile'da: pod 'ffmpeg-kit-react-native/min'
+  ✅ reanimated 4.x + worklets çakışması
+  ⚠️  reanimated 4.x — Hermes zorunlu
+       → reanimated 4.x Hermes olmadan iOS'ta çalışmıyor
+       ℹ  app.json: { "expo": { "jsEngine": "hermes" } }
+
+─────────────────────────────────────────────────────────────────
+  PAKET UYUMU
+─────────────────────────────────────────────────────────────────
+  ✅ gesture-handler 2.28.x
+  ✅ GestureHandlerRootView wrap
+
+─────────────────────────────────────────────────────────────────
+  İZINLER / CONFIG
+─────────────────────────────────────────────────────────────────
+  ✅ iOS İzin Metinleri
+
+─────────────────────────────────────────────────────────────────
+  BUILD CONFIG
+─────────────────────────────────────────────────────────────────
+  ✅ bundleIdentifier
+  ✅ Hermes etkin
+  ✅ iOS build number
+  ⚠️  ios/Podfile
+       → Podfile yok — pod install yapılmamış olabilir
+       ℹ  npx pod-install veya cd ios && pod install
+  ✅ eas.json
+  ⚠️  TypeScript ~5.9 (beta riski)
+       → TypeScript 5.9 henüz RC/beta aşamasında olabilir
+       ℹ  Sorun çıkarsa: npm install typescript@5.8 ile geri al
+
+═════════════════════════════════════════════════════════════════
+  ÖZET
+═════════════════════════════════════════════════════════════════
+  ❌ Kritik hata : 2
+  ⚠️  Uyarı       : 6
+  ✅ Geçen       : 13
+
+  ❌ KRİTİK HATALAR VAR — Önce bunları düzelt, sonra iOS build al.
+
+─────────────────────────────────────────────────────────────────
+  ÖNERİLEN BUILD SIRASI
+─────────────────────────────────────────────────────────────────
+  1. npx expo install --check          # sürüm uyumsuzluklarını otomatik düzelt
+  2. npx pod-install                   # CocoaPods güncelle
+  3. npx eas build --platform ios      # EAS cloud build
+     (veya lokal: npx expo run:ios --configuration Release)
+═════════════════════════════════════════════════════════════════

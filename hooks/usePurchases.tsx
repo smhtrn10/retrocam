@@ -9,6 +9,14 @@ const API_KEYS = {
   android: 'goog_XXXXXXXXXXXXXXXXXXXXXXXX', // TODO: RevenueCat dashboard'dan Android key'i girin
 };
 
+// Fallback prices shown when RevenueCat can't load (wrong key, no network, etc.)
+// These are display-only — actual purchase goes through RevenueCat
+const FALLBACK_PACKAGES: PurchasesPackage[] = [
+  { identifier: 'weekly', packageType: 'WEEKLY', product: { priceString: '$0.99', identifier: 'weekly' } } as unknown as PurchasesPackage,
+  { identifier: 'monthly', packageType: 'MONTHLY', product: { priceString: '$4.99', identifier: 'monthly' } } as unknown as PurchasesPackage,
+  { identifier: 'annual', packageType: 'ANNUAL', product: { priceString: '$29.99', identifier: 'annual' } } as unknown as PurchasesPackage,
+];
+
 let isRevenueCatConfigured = false;
 const PREMIUM_CACHE_KEY = 'is_pro_cache';
 
@@ -106,14 +114,8 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
 
       } catch (err) {
         console.error("Purchase Initialization Error (RevenueCat doesn't work in Expo Go!):", err);
-        // Fallback dummy packages for Expo Go (development only)
-        if (__DEV__) {
-          setPackages([
-            { identifier: 'weekly', packageType: 'WEEKLY', product: { priceString: '$0.99' } } as unknown as PurchasesPackage,
-            { identifier: 'monthly', packageType: 'MONTHLY', product: { priceString: '$1.99' } } as unknown as PurchasesPackage,
-            { identifier: 'yearly_dummy', packageType: 'ANNUAL', product: { priceString: '$4.99' } } as unknown as PurchasesPackage,
-          ]);
-        }
+        // Fallback packages when RevenueCat fails (wrong key, no network, etc.)
+        setPackages(FALLBACK_PACKAGES);
       } finally {
         setIsLoading(false);
       }

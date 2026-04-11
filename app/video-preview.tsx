@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,275 +7,266 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
-import { X, Download, Share2 } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { X, Download, Share2, Info } from 'lucide-react-native';
 import { CAMERA_PRESETS } from '@/constants/presets';
+import { usePurchases } from '@/hooks/usePurchases';
 import { buildFFmpegArgs } from '@/utils/videoFilter';
+import { useDevice } from '@/hooks/useDevice';
 
+// FFmpeg setup
 let FFmpegKit: any = null;
 let ReturnCode: any = null;
 try {
   const ffmpegModule = require('ffmpeg-kit-react-native');
   FFmpegKit = ffmpegModule.FFmpegKit;
   ReturnCode = ffmpegModule.ReturnCode;
-  console.log('[RetroCam] VideoPreview: FFmpegKit loaded');
-} catch {
-  console.log('[RetroCam] VideoPreview: FFmpegKit not available (Expo Go)');
+} catch (e) {
+  console.log('[RetroCam] FFmpeg not available (Expo Go)');
 }
 
 // Helper to get raw path for FFmpeg
 const getSafePath = (uri: string) => {
   if (!uri) return '';
-  // Single normalization point: handle arrays and decode once
   const rawUri = decodeURIComponent(Array.isArray(uri) ? uri[0] : uri);
   return rawUri.replace(/^file:\/\//, '');
 };
 
+
 export default function VideoPreviewScreen() {
-  const { uri, presetId } = useLocalSearchParams<{ uri: string; presetId: string }>();
+  const { uri: encodedUri, presetId } = useLocalSearchParams<{ uri: string; presetId: string }>();
+  const uri = useMemo(() => decodeURIComponent(encodedUri), [encodedUri]);
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, isTablet, scale: uiScale } = useDevice();
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-  const [filteredUri, setFilteredUri] = useState<string>(uri);
+  const [filteredUri, setFilteredUri] = useState<string | null>(null);
   const [filterApplied, setFilterApplied] = useState(false);
-  const [filterFailed, setFilterFailed] = useState(false);
-
-  // Always holds the latest filteredUri — avoids stale closure in useCallback
+  const [error, setError] = useState<string | null>(null);
+  const { isPro, showPaywall } = usePurchases();
+  
+  const isMounted = useRef(true);
+  const tempFilesRef = useRef<string[]>([]);
   const filteredUriRef = useRef<string>(uri);
 
-  // Track temp files for cleanup
-  const tempFilesRef = useRef<string[]>([]);
-  const preset = CAMERA_PRESETS.find(p => p.id === presetId) ?? CAMERA_PRESETS[0];
-
-  // Initialize player with original uri — replace() called after filter is applied
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
-    p.play();
-  });
-
-  // Replace source only when filteredUri actually changes (after FFmpeg succeeds)
   useEffect(() => {
-    if (player && filteredUri && filteredUri !== uri) {
-      player.replace(filteredUri);
-    }
-  }, [filteredUri]); // intentionally exclude player and uri — only react to filter result
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
-  // Apply FFmpeg filter once on mount — uri and presetId are stable route params
+  const preset = useMemo(
+    () => CAMERA_PRESETS.find((p) => p.id === presetId) || CAMERA_PRESETS[0],
+    [presetId]
+  );
+
+  // Apply filter automatically on mount
   useEffect(() => {
     if (!FFmpegKit || !uri) return;
-
-    const applyFilter = async () => {
+    
+    let active = true;
+    const process = async () => {
       setIsProcessing(true);
-      setFilterFailed(false);
-
+      setError(null);
+      
       const rawInputPath = getSafePath(uri);
-      const fileUri = rawInputPath.startsWith('/') ? `file://${rawInputPath}` : rawInputPath;
-
-      const fileName = `retrocam_video_${Date.now()}.mp4`;
+      const fileName = `retrocam_v_${Date.now()}.mp4`;
       const outputUri = (FileSystem.documentDirectory ?? '') + fileName;
       const rawOutputPath = getSafePath(outputUri);
 
       try {
         const args = buildFFmpegArgs(rawInputPath, rawOutputPath, preset.settings);
-        console.log('[RetroCam] FFmpeg inputPath:', rawInputPath);
-        console.log('[RetroCam] FFmpeg outputPath:', rawOutputPath);
-        console.log('[RetroCam] FFmpeg filter args:', args.join(' '));
-
-        const inputExists = await FileSystem.getInfoAsync(fileUri);
-        if (!inputExists.exists) {
-          throw new Error(`Input file does not exist: ${fileUri}`);
-        }
-
         const session = await FFmpegKit.executeWithArguments(args);
         const returnCode = await session.getReturnCode();
 
-        console.log('[RetroCam] FFmpeg return code:', returnCode?.getValue?.());
-
-        if (ReturnCode && ReturnCode.isSuccess(returnCode)) {
-          console.log('[RetroCam] Filter applied successfully:', outputUri);
-          tempFilesRef.current.push(outputUri);
-          filteredUriRef.current = outputUri; // update ref immediately — safe for callbacks
-          setFilteredUri(outputUri);
-          setFilterApplied(true);
-        } else {
-          const logs = await session.getLogs();
-          const lastLogs = logs?.slice(-15).map((l: any) => l.getMessage()).join('\n') ?? 'No logs available';
-          const failStackTrace = await session.getFailStackTrace();
-
-          console.error('[RetroCam] FFmpeg failed with code:', returnCode?.getValue());
-          console.error('[RetroCam] FFmpeg Error Logs:\n', lastLogs);
-          if (failStackTrace) console.error('[RetroCam] FFmpeg StackTrace:', failStackTrace);
-
-          setFilterFailed(true);
-          const errorSnippet = lastLogs.length > 500 ? `...${lastLogs.slice(-500)}` : lastLogs;
-          Alert.alert(
-            'Filter Warning',
-            `Could not apply the cinematic filter. Details:\n\n${errorSnippet}`,
-            [{ text: 'OK' }]
-          );
+        if (active && isMounted.current) {
+          if (ReturnCode && ReturnCode.isSuccess(returnCode)) {
+            tempFilesRef.current.push(outputUri);
+            filteredUriRef.current = outputUri;
+            setFilteredUri(outputUri);
+            setFilterApplied(true);
+          } else {
+            const logs = await session.getLogs();
+            const lastLogs = logs?.slice(-10).map((l: any) => l.getMessage()).join('\n') || 'Unknown error';
+            setError(`FFmpeg Error: ${lastLogs}`);
+            console.error('[RetroCam] FFmpeg failed:', lastLogs);
+          }
         }
-      } catch (e: any) {
-        console.error('[RetroCam] FFmpeg critical error:', e);
-        setFilterFailed(true);
-        Alert.alert('Processing Error', `An error occurred: ${e.message}`);
+      } catch (err: any) {
+        if (active && isMounted.current) {
+          setError(err.message || 'Processing failed');
+        }
       } finally {
-        setIsProcessing(false);
+        if (active && isMounted.current) setIsProcessing(false);
       }
     };
 
-    applyFilter();
-  }, []); // Run once on mount — uri and preset are stable from route params
+    const t = setTimeout(process, 400);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [uri, preset]);
 
-  // Cleanup temp files on unmount
+  const player = useVideoPlayer(filteredUri || uri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+
+  // Hot-swap video player source when filter is ready
+  useEffect(() => {
+    if (player && filteredUri && filteredUri !== uri) {
+      player.replace(filteredUri);
+    }
+  }, [filteredUri]);
+
+  // Cleanup temp files
   useEffect(() => {
     return () => {
       tempFilesRef.current.forEach(async (path) => {
-        try {
-          await FileSystem.deleteAsync(path, { idempotent: true });
-        } catch { /* noop */ }
+        try { await FileSystem.deleteAsync(path, { idempotent: true }); } catch { }
       });
     };
   }, []);
 
-  const saveToGallery = useCallback(async (fileUri: string) => {
-    // Check permission first to avoid double dialog on iOS
-    const { status } = await MediaLibrary.getPermissionsAsync();
-    if (status !== 'granted') {
-      const { status: newStatus } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
-      if (newStatus !== 'granted') return false;
-    }
-    await MediaLibrary.saveToLibraryAsync(fileUri);
-    return true;
-  }, []);
-
   const handleSave = useCallback(async () => {
-    const uriToSave = filteredUriRef.current; // always the latest — never stale
+    const targetUri = filteredUriRef.current;
+    if (isProcessing) return;
+    
     setIsSaving(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const saved = await saveToGallery(uriToSave);
-      if (saved) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Clean up temp file after successful save
-        try {
-          await FileSystem.deleteAsync(uriToSave, { idempotent: true });
-          tempFilesRef.current = tempFilesRef.current.filter(p => p !== uriToSave);
-        } catch { /* noop */ }
-        Alert.alert('Saved!', 'Video saved to your gallery');
-      } else if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uriToSave, { dialogTitle: 'Save your video' });
+      const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+      if (status === 'granted') {
+        await MediaLibrary.saveToLibraryAsync(targetUri);
+        if (isMounted.current) {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Success', 'Video saved to gallery');
+        }
       } else {
-        Alert.alert('Error', 'Could not save video.');
+        if (isMounted.current && await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(targetUri);
+        }
       }
-    } catch (e) {
-      console.error('Save error:', e);
-      Alert.alert('Error', 'Failed to save video');
+    } catch (err) {
+      if (isMounted.current) Alert.alert('Error', 'Failed to save video.');
     } finally {
-      setIsSaving(false);
+      if (isMounted.current) setIsSaving(false);
     }
-  }, [saveToGallery]); // no filteredUri dep needed — reading from ref
+  }, [isProcessing]);
 
   const handleShare = useCallback(async () => {
-    const uriToShare = filteredUriRef.current; // always the latest
+    const targetUri = filteredUriRef.current;
     setIsSharing(true);
     try {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uriToShare, { mimeType: 'video/mp4' });
+      if (isMounted.current && await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(targetUri);
       }
-    } catch { /* noop */ }
-    finally { setIsSharing(false); }
+    } catch (err) { /* noop */ }
+    finally { if (isMounted.current) setIsSharing(false); }
   }, []);
 
-  const statusBadge = () => {
-    if (!FFmpegKit) return <Text style={styles.badgeWarn}>Preview Only (Expo Go)</Text>;
-    if (isProcessing) return <Text style={styles.badgeProcessing}>Processing...</Text>;
-    if (filterApplied) return <Text style={styles.badgeSuccess}>✓ Filter Applied</Text>;
-    if (filterFailed) return <Text style={styles.badgeWarn}>⚠ Filter Failed — Original</Text>;
-    return null;
-  };
+  const VIDEO_HEIGHT = isTablet ? SCREEN_HEIGHT * 0.6 : SCREEN_HEIGHT * 0.65;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
-          <X size={22} color="#FFF" />
+      <View style={[styles.header, { paddingHorizontal: isTablet ? 32 : 16 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]}>
+          <X size={22 * uiScale} color="#FFF" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.presetName}>{preset.name}</Text>
-          {statusBadge()}
+          <Text style={[styles.presetName, { fontSize: 16 * uiScale }]}>{preset.name}</Text>
+          <Text style={[styles.statusSub, { fontSize: 10 * uiScale }]}>
+            {isProcessing ? 'DEVELOPING...' : filterApplied ? 'FILTER APPLIED' : 'ORIGINAL PREVIEW'}
+          </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 44 * uiScale }} />
       </View>
 
-      {/* Video Player */}
-      <View style={styles.videoContainer}>
+      {/* Video View */}
+      <View style={[styles.videoContainer, { height: VIDEO_HEIGHT, width: isTablet ? Math.min(SCREEN_WIDTH - 64, 800) : '100%', alignSelf: 'center', borderRadius: isTablet ? 16 : 0, overflow: 'hidden' }]}>
         <VideoView
           player={player}
           style={styles.video}
           contentFit="cover"
           nativeControls={false}
         />
-
-        {/* Overlay effects shown only when filter not yet applied */}
-        {!filterApplied && preset.settings.tintOpacity > 0 && (
-          <View style={[StyleSheet.absoluteFillObject, {
-            backgroundColor: preset.settings.tint,
-            opacity: preset.settings.tintOpacity,
-          }]} />
-        )}
-        {!filterApplied && preset.settings.vignette > 0 && (
-          <View style={[styles.vignette, { opacity: preset.settings.vignette * 0.9 }]} />
-        )}
-
-        {/* Processing overlay */}
+        
         {isProcessing && (
-          <View style={styles.processingOverlay}>
-            <ActivityIndicator color="#FFB800" size="large" />
-            <Text style={styles.processingText}>Applying {preset.name} filter...</Text>
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color="#FFB800" />
+            <Text style={[styles.overlayText, { fontSize: 14 * uiScale }]}>Developing video...</Text>
           </View>
         )}
-      </View>
 
-      {/* Info */}
-      <View style={styles.infoStrip}>
-        <View style={[styles.presetDot, { backgroundColor: preset.color }]} />
-        <Text style={styles.presetDesc}>{preset.description}</Text>
+        {error && (
+          <View style={styles.errorOverlay}>
+            <Info size={32 * uiScale} color="#FF3B30" />
+            <Text style={[styles.errorText, { fontSize: 14 * uiScale }]}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => router.back()}>
+              <Text style={styles.retryText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Real-time overlay preview (if not yet processed) */}
+        {!filterApplied && !isProcessing && preset.settings.tintOpacity > 0 && (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: preset.settings.tint, opacity: preset.settings.tintOpacity * 0.5 }]} pointerEvents="none" />
+        )}
       </View>
 
       {/* Actions */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary, (isSharing || isProcessing) && styles.actionBtnDisabled]}
-          onPress={handleShare}
-          disabled={isSharing || isProcessing}
-        >
-          {isSharing ? <ActivityIndicator color="#FFF" size="small" /> : <Share2 size={20} color="#FFF" />}
-          <Text style={styles.actionBtnText}>Share</Text>
-        </TouchableOpacity>
+      <ScrollView style={styles.bottomScroll} contentContainerStyle={[styles.bottomContent, { paddingHorizontal: isTablet ? 32 : 20 }]}>
+        <View style={styles.infoRow}>
+          <View style={[styles.presetDot, { backgroundColor: preset.color }]} />
+          <Text style={[styles.presetInfo, { fontSize: 13 * uiScale }]}>
+            Using {preset.name} filter ({preset.cameraType})
+          </Text>
+        </View>
 
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnPrimary, (isSaving || isProcessing) && styles.actionBtnDisabled]}
-          onPress={handleSave}
-          disabled={isSaving || isProcessing}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#000" size="small" />
-          ) : (
-            <>
-              <Download size={20} color="#000" />
-              <Text style={[styles.actionBtnText, { color: '#000' }]}>Save</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={[styles.actions, { gap: isTablet ? 24 : 12 }]}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnSecondary, (isProcessing || isSharing) && styles.btnDisabled, { paddingVertical: 14 * uiScale, borderRadius: 28 * uiScale }]}
+            onPress={handleShare}
+            disabled={isProcessing || isSharing}
+          >
+            {isSharing ? <ActivityIndicator color="#FFF" /> : <Share2 size={20 * uiScale} color="#FFF" />}
+            <Text style={[styles.actionBtnText, { fontSize: 15 * uiScale }]}>Share</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnPrimary, (isProcessing || isSaving) && styles.btnDisabled, { paddingVertical: 14 * uiScale, borderRadius: 28 * uiScale }]}
+            onPress={handleSave}
+            disabled={isProcessing || isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#000" size="small" />
+            ) : (
+              <>
+                <Download size={20 * uiScale} color="#000" />
+                <Text style={[styles.actionBtnText, { color: '#000', fontSize: 15 * uiScale }]}>Save Video</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {!isPro && (
+          <View style={styles.proHint}>
+            <Text style={[styles.proHintText, { fontSize: 10 * uiScale }]}>
+              Upgrade to Pro to remove watermark and access cinematic 4K exports.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -283,57 +274,87 @@ export default function VideoPreviewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 10,
+    paddingVertical: 12,
   },
   iconButton: {
-    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center', alignItems: 'center',
   },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  presetName: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  badgeSuccess: { color: '#06D6A0', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  badgeWarn: { color: '#FFB800', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  badgeProcessing: { color: '#888', fontSize: 11, marginTop: 2 },
-  videoContainer: { flex: 1, backgroundColor: '#000', position: 'relative' },
-  video: { flex: 1 },
-  vignette: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 80,
+  headerCenter: { alignItems: 'center' },
+  presetName: { color: '#FFF', fontWeight: '800', letterSpacing: 0.5 },
+  statusSub: { color: '#FFB800', fontWeight: '700', marginTop: 2 },
+  
+  videoContainer: {
+    backgroundColor: '#0A0A0A',
+    position: 'relative',
   },
-  processingOverlay: {
+  video: { width: '100%', height: '100%' },
+  
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
   },
-  processingText: { color: '#FFB800', fontSize: 14, fontWeight: '700' },
-  infoStrip: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 10, gap: 8,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
+  overlayText: { color: '#FFB800', fontWeight: '700' },
+  
+  errorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
   },
-  presetDot: { width: 10, height: 10, borderRadius: 5 },
-  presetDesc: { color: '#666', fontSize: 12, flex: 1 },
+  errorText: { color: '#FFF', textAlign: 'center', fontWeight: '500' },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+  },
+  retryText: { color: '#FFF', fontWeight: '700' },
+
+  bottomScroll: { flex: 1 },
+  bottomContent: { paddingTop: 16, paddingBottom: 20 },
+  
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+    opacity: 0.7,
+  },
+  presetDot: { width: 8, height: 8, borderRadius: 4 },
+  presetInfo: { color: '#FFF', fontWeight: '500' },
+  
   actions: {
-    flexDirection: 'row', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 16,
+    flexDirection: 'row',
   },
   actionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 8,
-    paddingVertical: 14, borderRadius: 28,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   actionBtnPrimary: { backgroundColor: '#FFB800' },
   actionBtnSecondary: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  actionBtnDisabled: { opacity: 0.4 },
-  actionBtnText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+  actionBtnText: { color: '#FFF', fontWeight: '700' },
+  btnDisabled: { opacity: 0.4 },
+  
+  proHint: {
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: 'rgba(255,184,0,0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.1)',
+  },
+  proHintText: { color: 'rgba(255,184,0,0.6)', textAlign: 'center', lineHeight: 16 },
 });

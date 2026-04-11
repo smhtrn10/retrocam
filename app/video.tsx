@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { X, Video, Square, Aperture, Zap } from 'lucide-react-native';
 import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { usePurchases } from '@/hooks/usePurchases';
+import { useDevice } from '@/hooks/useDevice';
 
 // Show all presets in video screen, default to free vhs-glitch
 const VIDEO_PRESETS = CAMERA_PRESETS;
@@ -24,15 +25,24 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
 
  export default function VideoScreen() {
   const { t } = useTranslation();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, isTablet, scale: uiScale } = useDevice();
   const [camPermission, requestCamPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const isRecordingRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const t = setTimeout(() => setIsCameraActive(true), 300);
+      const t = setTimeout(() => {
+        if (isMounted.current) setIsCameraActive(true);
+      }, 300);
       return () => {
         clearTimeout(t);
         if (isRecordingRef.current) cameraRef.current?.stopRecording();
@@ -88,25 +98,27 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
 
-      // Recording finished — clean up state immediately
-      setIsRecording(false);
-      isRecordingRef.current = false;
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (isMounted.current) {
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
-      if (video?.uri) {
-        // Navigate to preview screen — FFmpeg filter applied there
-        router.push({
-          pathname: '/video-preview' as any,
-          params: { uri: encodeURIComponent(video.uri), presetId: selectedPreset.id },
-        });
+        if (video?.uri) {
+          router.push({
+            pathname: '/video-preview' as any,
+            params: { uri: encodeURIComponent(video.uri), presetId: selectedPreset.id },
+          });
+        }
       }
     } catch (err) {
       console.error('Record error:', err);
-      setIsRecording(false);
-      isRecordingRef.current = false;
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (isMounted.current) {
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      }
     }
-  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission, selectedPreset]);
+  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission, selectedPreset, isPro, showPaywall]);
 
   const stopRecording = useCallback(() => {
     if (!cameraRef.current || !isRecording) return;
@@ -130,18 +142,22 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-          <X size={22} color="#FFFFFF" />
+      <View style={[styles.header, { paddingHorizontal: isTablet ? 32 : 16 }]}>
+        <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={() => router.back()}>
+          <X size={22 * uiScale} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('common.video')}</Text>
-        <TouchableOpacity style={styles.iconButton} onPress={cycleEffect}>
-          <Zap size={22} color={effect !== 'none' ? '#FFB800' : '#FFFFFF'} />
+        <Text style={[styles.headerTitle, { fontSize: 16 * uiScale }]}>{t('common.video')}</Text>
+        <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={cycleEffect}>
+          <Zap size={22 * uiScale} color={effect !== 'none' ? '#FFB800' : '#FFFFFF'} />
         </TouchableOpacity>
       </View>
 
       {/* Camera — only mount when active */}
-      <View style={styles.cameraWrapper}>
+      <View style={[styles.cameraWrapper, { 
+        aspectRatio: isTablet ? 4 / 3 : 9 / 16, 
+        width: isTablet ? Math.min(SCREEN_WIDTH - 64, 800) : '100%',
+        borderRadius: isTablet ? 16 : 12,
+      }]}>
         {isCameraActive && (
           <CameraView
             ref={cameraRef}
@@ -192,13 +208,6 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
           </View>
         )}
 
-        {/* Processing overlay */}
-        {false && (
-          <View style={styles.processingOverlay}>
-            <Text style={styles.processingText}>Applying filter...</Text>
-          </View>
-        )}
-
         {/* Recording timer */}
         {isRecording && (
           <View style={styles.recIndicator}>
@@ -216,11 +225,11 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
       </View>
 
       {/* Bottom controls */}
-      <View style={styles.bottomContainer}>
+      <View style={[styles.bottomContainer, { paddingBottom: Platform.OS === 'ios' ? (isTablet ? 32 : 20) : 12 }]}>
         <CameraCarousel
           presets={VIDEO_PRESETS}
           selectedId={selectedPreset.id}
-          onSelect={(preset) => {
+          onSelect={(preset: CameraPreset) => {
             if (!isPro && preset.isPro) {
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               showPaywall(preset.id);
@@ -231,30 +240,34 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
           isPro={isPro}
         />
 
-        <View style={styles.controls}>
+        <View style={[styles.controls, { paddingHorizontal: isTablet ? 80 : 40 }]}>
           <TouchableOpacity
-            style={styles.flipButton}
+            style={[styles.flipButton, { width: 56 * uiScale, height: 56 * uiScale, borderRadius: 28 * uiScale }]}
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
           >
-            <Aperture size={24} color="#FFFFFF" />
+            <Aperture size={24 * uiScale} color="#FFFFFF" />
           </TouchableOpacity>
 
           {/* Record button */}
           <TouchableOpacity
-            style={[styles.recordButton, isRecording && styles.recordingButton]}
+            style={[
+              styles.recordButton, 
+              { width: 72 * uiScale, height: 72 * uiScale, borderRadius: 36 * uiScale, borderWidth: 4 * uiScale },
+              isRecording && styles.recordingButton
+            ]}
             onPress={isRecording ? stopRecording : startRecording}
           >
             {isRecording ? (
-              <Square size={28} color="#FFFFFF" fill="#FFFFFF" />
+              <Square size={28 * uiScale} color="#FFFFFF" fill="#FFFFFF" />
             ) : (
-              <Video size={28} color="#FFFFFF" />
+              <Video size={28 * uiScale} color="#FFFFFF" />
             )}
           </TouchableOpacity>
 
-          <View style={styles.placeholder} />
+          <View style={{ width: 56 * uiScale }} />
         </View>
 
-        <Text style={styles.hint}>{t('video.hint')}</Text>
+        <Text style={[styles.hint, { fontSize: 11 * uiScale }]}>{t('video.hint')}</Text>
       </View>
     </SafeAreaView>
   );
@@ -266,28 +279,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  headerTitle: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  headerTitle: { color: '#FFF', fontWeight: '600' },
   iconButton: {
-    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center', alignItems: 'center',
   },
   cameraWrapper: {
     flex: 1,
-    aspectRatio: 9 / 16,
     alignSelf: 'center',
     overflow: 'hidden',
-    borderRadius: 12,
-    width: '100%',
   },
   camera: { flex: 1 },
   scanlines: {
     ...StyleSheet.absoluteFillObject,
-    backgroundImage: undefined,
-    // Simulated scanlines via repeating semi-transparent stripes
     backgroundColor: 'transparent',
     borderTopWidth: 2,
     borderTopColor: 'rgba(0,0,0,0.15)',
@@ -304,17 +310,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 80,
-  },
-  processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  processingText: {
-    color: '#FFB800',
-    fontSize: 14,
-    fontWeight: '700',
   },
   effectBadge: {
     position: 'absolute',
@@ -350,34 +345,28 @@ const styles = StyleSheet.create({
   },
   bottomContainer: {
     backgroundColor: '#000',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
   },
   controls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 40,
     paddingVertical: 16,
   },
   flipButton: {
-    width: 48, height: 48, borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center', alignItems: 'center',
   },
   recordButton: {
-    width: 72, height: 72, borderRadius: 36,
     backgroundColor: '#FF3B30',
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 4, borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   recordingButton: {
     backgroundColor: '#FF3B30',
     borderColor: '#FFFFFF',
   },
-  placeholder: { width: 48 },
   hint: {
     color: '#555',
-    fontSize: 11,
     textAlign: 'center',
     paddingBottom: 4,
   },

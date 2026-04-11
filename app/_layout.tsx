@@ -9,6 +9,8 @@ import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import '@/i18n';
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 // LY-3: splash screen'i otomatik gizlenmesini engelle
 SplashScreen.preventAutoHideAsync();
 
@@ -16,13 +18,15 @@ const queryClient = new QueryClient();
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <PurchasesProvider>
-          <RootContent />
-        </PurchasesProvider>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <PurchasesProvider>
+            <RootContent />
+          </PurchasesProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

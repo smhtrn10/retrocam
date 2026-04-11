@@ -1,7 +1,7 @@
 import { useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Dimensions, Animated, FlatList,
+  Animated, FlatList,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { CameraPreset } from '@/constants/presets';
@@ -10,26 +10,18 @@ import {
   HasselIcon, Super8Icon, Y2KIcon, OlympusPenIcon, LomoIcon,
   NoirIcon, GenericCamIcon,
 } from '@/components/CameraIcons';
+import { useDevice } from '@/hooks/useDevice';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ITEM_WIDTH = 80;
-const ITEM_HEIGHT = 100;
-const SPACING = 12;
-const FULL_ITEM = ITEM_WIDTH + SPACING;
-const CENTER_OFFSET = (SCREEN_WIDTH - ITEM_WIDTH) / 2;
+// Constants moved inside component for responsiveness
+const BASE_ITEM_WIDTH = 80;
+const BASE_ITEM_HEIGHT = 100;
+const BASE_SPACING = 12;
 
 // HOT presets
 const HOT_IDS = new Set([
   'disposable-flash', 'vhs-classic', 'y2k-digital', 'kodak-gold-200',
   'fuji-quicksnap', 'handycam-dcr', 'super8-kodachrome', 'fisheye-lomo',
 ]);
-
-interface CameraCarouselProps {
-  presets: CameraPreset[];
-  selectedId: string;
-  onSelect: (preset: CameraPreset) => void;
-  isPro: boolean;
-}
 
 function getCameraIcon(preset: CameraPreset, size = 48) {
   const id = preset.id;
@@ -103,7 +95,21 @@ function shortName(preset: CameraPreset): string {
   return map[preset.id] ?? preset.name.slice(0, 6);
 }
 
+interface CameraCarouselProps {
+  presets: CameraPreset[];
+  selectedId: string;
+  onSelect: (preset: CameraPreset) => void;
+  isPro: boolean;
+}
+
 export function CameraCarousel({ presets, selectedId, onSelect, isPro }: CameraCarouselProps) {
+  const { width: SCREEN_WIDTH, scale: uiScale } = useDevice();
+  const ITEM_WIDTH = BASE_ITEM_WIDTH * uiScale;
+  const ITEM_HEIGHT = BASE_ITEM_HEIGHT * uiScale;
+  const SPACING = BASE_SPACING * uiScale;
+  const FULL_ITEM = ITEM_WIDTH + SPACING;
+  const CENTER_OFFSET = (SCREEN_WIDTH - ITEM_WIDTH) / 2;
+
   const flatRef = useRef<FlatList<CameraPreset>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
@@ -127,9 +133,9 @@ export function CameraCarousel({ presets, selectedId, onSelect, isPro }: CameraC
       <TouchableOpacity
         onPress={() => handleSelect(preset, index)}
         activeOpacity={0.8}
-        style={styles.itemTouch}
+        style={[styles.itemTouch, { marginHorizontal: SPACING / 2 }]}
       >
-        <Animated.View style={[styles.item, { transform: [{ scale }], opacity }]}>
+        <Animated.View style={[styles.item, { width: ITEM_WIDTH, transform: [{ scale }], opacity }]}>
           {/* HOT badge */}
           {isHot && (
             <View style={styles.hotBadge}>
@@ -140,26 +146,27 @@ export function CameraCarousel({ presets, selectedId, onSelect, isPro }: CameraC
           {/* Camera icon card */}
           <View style={[
             styles.iconCard,
+            { width: ITEM_WIDTH, height: 64 * uiScale, borderRadius: 14 * uiScale },
             isSelected && styles.iconCardSelected,
             isLocked && styles.iconCardLocked,
           ]}>
-            {getCameraIcon(preset, 46)}
-            {isLocked && <View style={styles.lockVeil}><Text style={styles.lockEmoji}>🔒</Text></View>}
+            {getCameraIcon(preset, 46 * uiScale)}
+            {isLocked && <View style={[styles.lockVeil, { borderRadius: 14 * uiScale }]}><Text style={[styles.lockEmoji, { fontSize: 18 * uiScale }]}>🔒</Text></View>}
           </View>
 
           {/* Short name — selected gets pill */}
           <View style={[styles.namePill, isSelected && styles.namePillSelected]}>
-            <Text style={[styles.nameText, isSelected && styles.nameTextSelected]} numberOfLines={1}>
+            <Text style={[styles.nameText, { fontSize: 10 * uiScale }, isSelected && styles.nameTextSelected]} numberOfLines={1}>
               {label}
             </Text>
           </View>
         </Animated.View>
       </TouchableOpacity>
     );
-  }, [selectedId, isPro, scrollX, handleSelect]);
+  }, [selectedId, isPro, scrollX, handleSelect, ITEM_WIDTH, FULL_ITEM, SPACING, uiScale]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: ITEM_HEIGHT + 8 }]}>
       <Animated.FlatList
         ref={flatRef}
         data={presets}
@@ -167,7 +174,7 @@ export function CameraCarousel({ presets, selectedId, onSelect, isPro }: CameraC
         renderItem={renderItem}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingHorizontal: CENTER_OFFSET }]}
         decelerationRate="fast"
         snapToInterval={FULL_ITEM}
         snapToAlignment="start"
@@ -183,16 +190,13 @@ export function CameraCarousel({ presets, selectedId, onSelect, isPro }: CameraC
 }
 
 const styles = StyleSheet.create({
-  container: { height: ITEM_HEIGHT + 8 },
-  content: { paddingHorizontal: CENTER_OFFSET, alignItems: 'flex-start', paddingVertical: 4 },
+  container: { },
+  content: { alignItems: 'flex-start', paddingVertical: 4 },
 
-  itemTouch: { marginHorizontal: SPACING / 2 },
-  item: { width: ITEM_WIDTH, alignItems: 'center' },
+  itemTouch: { },
+  item: { alignItems: 'center' },
 
   iconCard: {
-    width: ITEM_WIDTH,
-    height: 64,
-    borderRadius: 14,
     backgroundColor: '#1C1C1E',
     justifyContent: 'center',
     alignItems: 'center',
@@ -217,9 +221,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 14,
   },
-  lockEmoji: { fontSize: 18 },
+  lockEmoji: { },
 
   hotBadge: {
     position: 'absolute',
@@ -245,7 +248,6 @@ const styles = StyleSheet.create({
   },
   nameText: {
     color: '#666',
-    fontSize: 10,
     fontWeight: '500',
     textAlign: 'center',
   },

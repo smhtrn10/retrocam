@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,11 +31,11 @@ import { ShutterButton } from '@/components/ShutterButton';
 import { CameraPreset, CameraType as CamType, CAMERA_PRESETS, CAMERA_TYPE_ICONS, CAMERA_TYPE_LABELS } from '@/constants/presets';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useTrending } from '@/hooks/useTrending';
+import { useDevice } from '@/hooks/useDevice';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
- export default function CameraScreen() {
+export default function CameraScreen() {
   const { t } = useTranslation();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, isTablet, scale: uiScale } = useDevice();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(CAMERA_PRESETS[0]);
@@ -44,6 +43,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   const [showTrending, setShowTrending] = useState(false);
   const [activeCategory, setActiveCategory] = useState<CamType | 'all'>('all');
   const cameraRef = useRef<CameraView>(null);
+  const isMounted = useRef(true);
   const { isPro, showPaywall } = usePurchases();
   const trendingPresets = useTrending();
   
@@ -51,9 +51,16 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   const [isSnapMode, setIsSnapMode] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
 
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const t = setTimeout(() => setIsCameraActive(true), 300);
+      const t = setTimeout(() => {
+        if (isMounted.current) setIsCameraActive(true);
+      }, 300);
       return () => {
         clearTimeout(t);
         setIsCameraActive(false);
@@ -64,10 +71,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   // Preset name fade animation
   const nameOpacity = useRef(new Animated.Value(1)).current;
   const nameTranslateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Permission is handled during onboarding
-  }, [permission, requestPermission]);
 
   const dailyCamera = useMemo(() => {
     const today = new Date().getDay();
@@ -88,13 +91,20 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
   }, []);
 
   const getCameraSize = useMemo(() => {
+    // For iPad, we use more square-ish or wider ratios to avoid extreme stretching
+    const maxWidth = isTablet ? Math.min(SCREEN_WIDTH, 800) : SCREEN_WIDTH;
+    
     switch (aspectRatio) {
-      case '1:1': return { width: SCREEN_WIDTH, height: SCREEN_WIDTH };
-      case '3:2': return { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 1.5 };
-      case '4:5': return { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 1.25 };
-      default: return { width: SCREEN_WIDTH, height: SCREEN_WIDTH * (16 / 9) }; // approximate full
+      case '1:1': return { width: maxWidth, height: maxWidth };
+      case '3:2': return { width: maxWidth, height: maxWidth * 1.5 };
+      case '4:5': return { width: maxWidth, height: maxWidth * 1.25 };
+      default: {
+        // approx full, but capped on tablet
+        const fullHeight = isTablet ? SCREEN_HEIGHT * 0.75 : SCREEN_WIDTH * (16 / 9);
+        return { width: maxWidth, height: fullHeight };
+      }
     }
-  }, [aspectRatio]);
+  }, [aspectRatio, SCREEN_WIDTH, SCREEN_HEIGHT, isTablet]);
 
   const toggleAspectRatio = useCallback(() => {
     const ratios: Array<'full' | '1:1' | '3:2' | '4:5'> = ['full', '1:1', '3:2', '4:5'];
@@ -129,7 +139,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
-      if (photo) {
+      if (photo && isMounted.current) {
         router.push({
           pathname: '/preview',
           params: { uri: photo.uri, presetId: selectedPreset.id },
@@ -138,14 +148,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
     } catch (error) {
       console.error('Capture error:', error);
     } finally {
-      setIsCapturing(false);
+      if (isMounted.current) setIsCapturing(false);
     }
   }, [isCapturing, selectedPreset]);
 
   const handleGalleryImport = useCallback(async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 1 });
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets[0] && isMounted.current) {
         router.push({
           pathname: '/preview',
           params: { uri: result.assets[0].uri, presetId: selectedPreset.id, isImport: 'true' },
@@ -156,7 +166,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
     }
   }, [selectedPreset]);
 
-   const handleRandomCamera = useCallback(() => {
+  const handleRandomCamera = useCallback(() => {
     if (!isPro) {
       showPaywall();
       return;
@@ -199,11 +209,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
+  const cameraSize = getCameraSize;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* ── Camera ── */}
       <View style={[styles.cameraContainer, { backgroundColor: '#000', justifyContent: 'center' }]}>
-        <View style={{ width: getCameraSize.width, height: getCameraSize.height, overflow: 'hidden', alignSelf: 'center' }}>
+        <View style={{ width: cameraSize.width, height: cameraSize.height, overflow: 'hidden', alignSelf: 'center', borderRadius: isTablet ? 12 : 0 }}>
           {isCameraActive && (
             <CameraView
               ref={cameraRef}
@@ -217,40 +229,40 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
         {/* Preset overlays — matched to FilteredImage Skia rendering */}
         {selectedPreset.settings.tintOpacity > 0 && (
-          <View style={[styles.overlay, { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center', backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} />
         )}
         {selectedPreset.settings.vignette > 0 && (
-          <View style={[styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} />
         )}
         {selectedPreset.settings.lightLeak > 0 && (
-          <View style={[styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} />
         )}
         {selectedPreset.settings.grain > 0 && (
-          <View style={[styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} />
         )}
         {selectedPreset.settings.rgbShift > 0 && (
-          <>
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center', overflow: 'hidden' }]}>
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,0,0,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: selectedPreset.settings.rgbShift * 8 }] }]} />
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,255,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: -selectedPreset.settings.rgbShift * 8 }] }]} />
-          </>
+          </View>
         )}
         {selectedPreset.settings.halation > 0 && (
-          <View style={[styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} />
         )}
         {selectedPreset.settings.flash > 0 && (
-          <View style={[styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} />
+          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} />
         )}
         {selectedPreset.settings.timestamp && (
-          <Text style={styles.timestamp}>
+          <Text style={[styles.timestamp, { right: (SCREEN_WIDTH - cameraSize.width) / 2 + 18, bottom: (SCREEN_HEIGHT - cameraSize.height) / 2 + 20 }]}>
             {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
           </Text>
         )}
 
         {/* ── Top bar ── */}
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingTop: isTablet ? 20 : 10, paddingHorizontal: isTablet ? 32 : 16 }]}>
           {!isSnapMode && (
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/settings')}>
-              <Settings size={22} color="#FFFFFF" />
+            <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={() => router.push('/settings')}>
+              <Settings size={22 * uiScale} color="#FFFFFF" />
             </TouchableOpacity>
           )}
 
@@ -262,23 +274,23 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={styles.dailyPill} onPress={handleDailyCamera}>
-                <Sparkles size={13} color="#FFB800" />
-                <Text style={styles.dailyText}>{t('common.daily')}</Text>
+                <Sparkles size={13 * uiScale} color="#FFB800" />
+                <Text style={[styles.dailyText, { fontSize: 12 * uiScale }]}>{t('common.daily')}</Text>
               </TouchableOpacity>
             )}
             
             <View style={styles.controlsRow}>
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
-                <Text style={styles.controlBtnText}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.controlBtn, isSnapMode && styles.controlBtnActive]} onPress={toggleSnapMode}>
-                <Text style={styles.controlBtnText}>SNAP</Text>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>SNAP</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.iconButton} onPress={toggleCamera}>
-            <FlipHorizontal size={22} color="#FFFFFF" />
+          <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={toggleCamera}>
+            <FlipHorizontal size={22 * uiScale} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -286,21 +298,21 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
         {!isSnapMode && (
           <View style={styles.presetNameContainer} pointerEvents="none">
             <Animated.View style={{ opacity: nameOpacity, transform: [{ translateY: nameTranslateY }], alignItems: 'center' }}>
-              <Text style={styles.cameraTypeLabel}>
+              <Text style={[styles.cameraTypeLabel, { fontSize: 11 * uiScale }]}>
                 {CAMERA_TYPE_ICONS[selectedPreset.cameraType]}  {CAMERA_TYPE_LABELS[selectedPreset.cameraType]}
               </Text>
-              <Text style={styles.presetNameBig}>{selectedPreset.name}</Text>
+              <Text style={[styles.presetNameBig, { fontSize: 22 * uiScale }]}>{selectedPreset.name}</Text>
               {selectedPreset.filmStock && (
-                <Text style={styles.filmStockLabel}>{selectedPreset.filmStock}</Text>
+                <Text style={[styles.filmStockLabel, { fontSize: 11 * uiScale }]}>{selectedPreset.filmStock}</Text>
               )}
-              <Text style={styles.presetDesc}>{selectedPreset.description}</Text>
+              <Text style={[styles.presetDesc, { fontSize: 12 * uiScale }]}>{selectedPreset.description}</Text>
             </Animated.View>
           </View>
         )}
       </View>
 
       {/* ── Bottom panel ── */}
-      <View style={styles.bottomContainer}>
+      <View style={[styles.bottomContainer, { paddingBottom: Platform.OS === 'ios' ? (isTablet ? 32 : 24) : 16 }]}>
 
         {/* Trending panel */}
          {showTrending && (
@@ -336,14 +348,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
               return (
                 <TouchableOpacity
                   key={cat}
-                  style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                  style={[styles.categoryPill, isActive && styles.categoryPillActive, { paddingHorizontal: 10 * uiScale, paddingVertical: 5 * uiScale }]}
                   onPress={() => {
                     setActiveCategory(cat);
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
                 >
-                  <Text style={styles.categoryIcon}>{icon}</Text>
-                  <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>{label}</Text>
+                  <Text style={[styles.categoryIcon, { fontSize: 12 * uiScale }]}>{icon}</Text>
+                  <Text style={[styles.categoryLabel, { fontSize: 11 * uiScale }, isActive && styles.categoryLabelActive]}>{label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -359,33 +371,33 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
         />
 
         {/* Shutter row */}
-        <View style={styles.shutterRow}>
+        <View style={[styles.shutterRow, { paddingHorizontal: isTablet ? 60 : 20 }]}>
           {/* Left actions */}
-           <View style={styles.sideActions}>
+           <View style={[styles.sideActions, { width: 110 * uiScale, gap: 16 * uiScale }]}>
             <TouchableOpacity style={styles.sideButton} onPress={handleGalleryImport}>
-              <ImageIcon size={22} color="#FFFFFF" />
-              <Text style={styles.sideLabel}>{t('common.import')}</Text>
+              <ImageIcon size={22 * uiScale} color="#FFFFFF" />
+              <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }]}>{t('common.import')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.sideButton} onPress={() => router.push('/video')}>
-              <Video size={22} color="#FFFFFF" />
-              <Text style={styles.sideLabel}>{t('common.video')}</Text>
+              <Video size={22 * uiScale} color="#FFFFFF" />
+              <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }]}>{t('common.video')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Shutter */}
           <View style={styles.shutterWrap}>
-            <ShutterButton onPress={handleCapture} disabled={isCapturing} />
+            <ShutterButton onPress={handleCapture} disabled={isCapturing} scale={uiScale} />
             {isCapturing && <ActivityIndicator style={styles.captureSpinner} color="#FFB800" size="large" />}
           </View>
 
           {/* Right actions */}
-           <View style={styles.sideActions}>
+           <View style={[styles.sideActions, { width: 110 * uiScale, gap: 16 * uiScale }]}>
             <TouchableOpacity style={styles.sideButton} onPress={handleRandomCamera}>
               <View style={styles.iconWithBadge}>
-                <RefreshCw size={22} color="#FFFFFF" />
-                {!isPro && <Lock size={10} color="#FFB800" style={styles.lockBadge} />}
+                <RefreshCw size={22 * uiScale} color="#FFFFFF" />
+                {!isPro && <Lock size={10 * uiScale} color="#FFB800" style={styles.lockBadge} />}
               </View>
-              <Text style={styles.sideLabel}>{t('common.random')}</Text>
+              <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }]}>{t('common.random')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.sideButton}
@@ -398,10 +410,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
               }}
             >
               <View style={styles.iconWithBadge}>
-                <TrendingUp size={22} color={showTrending ? '#FFB800' : '#FFFFFF'} />
-                {!isPro && <Lock size={10} color="#FFB800" style={styles.lockBadge} />}
+                <TrendingUp size={22 * uiScale} color={showTrending ? '#FFB800' : '#FFFFFF'} />
+                {!isPro && <Lock size={10 * uiScale} color="#FFB800" style={styles.lockBadge} />}
               </View>
-              <Text style={[styles.sideLabel, showTrending && styles.activeSideLabel]}>{t('common.trending')}</Text>
+              <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }, showTrending && styles.activeSideLabel]}>{t('common.trending')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -416,9 +428,8 @@ const styles = StyleSheet.create({
   // Camera
   cameraContainer: { flex: 1, position: 'relative' },
   camera: { flex: 1 },
-  overlay: { ...StyleSheet.absoluteFillObject },
+  overlay: { position: 'absolute' },
   vignetteOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0 },
@@ -426,7 +437,6 @@ const styles = StyleSheet.create({
     shadowRadius: 80,
   },
   lightLeakOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     shadowColor: '#FF8C00',
     shadowOffset: { width: -30, height: -30 },
@@ -434,11 +444,9 @@ const styles = StyleSheet.create({
     shadowRadius: 120,
   },
   grainOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(140,130,120,0.18)',
   },
   halationOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     shadowColor: '#FF3C00',
     shadowOffset: { width: 0, height: -40 },
@@ -446,13 +454,10 @@ const styles = StyleSheet.create({
     shadowRadius: 80,
   },
   flashOverlay: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255,255,240,0.25)',
   },
   timestamp: {
     position: 'absolute',
-    bottom: 80,
-    right: 18,
     color: 'rgba(255,180,50,0.9)',
     fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
@@ -465,11 +470,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
   },
   iconButton: {
-    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center', alignItems: 'center',
   },
@@ -484,7 +486,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,184,0,0.3)',
   },
-  dailyText: { color: '#FFB800', fontSize: 12, fontWeight: '700' },
+  dailyText: { color: '#FFB800', fontWeight: '700' },
   topBarCenter: { alignItems: 'center', gap: 10 },
   controlsRow: { flexDirection: 'row', gap: 8 },
   controlBtn: {
@@ -501,7 +503,6 @@ const styles = StyleSheet.create({
   },
   controlBtnText: {
     color: '#FFF',
-    fontSize: 10,
     fontWeight: '800',
   },
 
@@ -513,17 +514,8 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
-  packLabel: {
-    color: 'rgba(255,184,0,0.8)',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
   cameraTypeLabel: {
     color: 'rgba(255,184,0,0.85)',
-    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
@@ -531,7 +523,6 @@ const styles = StyleSheet.create({
   },
   filmStockLabel: {
     color: 'rgba(255,255,255,0.45)',
-    fontSize: 11,
     marginTop: 1,
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.6)',
@@ -540,7 +531,6 @@ const styles = StyleSheet.create({
   },
   presetNameBig: {
     color: '#FFFFFF',
-    fontSize: 22,
     fontWeight: '800',
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.8)',
@@ -549,7 +539,6 @@ const styles = StyleSheet.create({
   },
   presetDesc: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: 12,
     marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
@@ -559,7 +548,6 @@ const styles = StyleSheet.create({
   // Bottom
   bottomContainer: {
     backgroundColor: '#000',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
   },
 
   // Trending
@@ -601,27 +589,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
   },
   sideActions: {
     flexDirection: 'row',
-    gap: 16,
-    width: 110,
   },
   sideButton: { alignItems: 'center', gap: 3 },
-  sideLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '500' },
+  sideLabel: { color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
   activeSideLabel: { color: '#FFB800' },
   shutterWrap: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   captureSpinner: { position: 'absolute' },
 
   // Category bar
-  categoryBar: { maxHeight: 36 },
+  categoryBar: { maxHeight: 40 },
   categoryList: { paddingHorizontal: 12, gap: 6, alignItems: 'center', paddingVertical: 4 },
   categoryPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'transparent',
   },
@@ -629,8 +614,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,184,0,0.12)',
     borderColor: '#FFB800',
   },
-  categoryIcon: { fontSize: 12 },
-  categoryLabel: { color: '#666', fontSize: 11, fontWeight: '500' },
+  categoryIcon: { },
+  categoryLabel: { color: '#666', fontWeight: '500' },
   categoryLabelActive: { color: '#FFB800', fontWeight: '700' },
 
   // Free Tag Styles
