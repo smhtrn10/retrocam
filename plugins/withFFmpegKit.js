@@ -190,10 +190,13 @@ const withPatchFFmpegReactNativePodspec = (config) =>
         `s.source = { :path => '.' } # patched-by-withFFmpegKit`
       );
 
-      // ffmpeg-kit-full-gpl bağımlılığından versiyon kısıtını kaldır
+      // versiyon kısıtını kaldır + header search path ekle
       contents = contents.replace(
         /s\.dependency\s+['"]ffmpeg-kit-full-gpl['"][^\n]*/,
-        `s.dependency 'ffmpeg-kit-full-gpl'`
+        `s.dependency 'ffmpeg-kit-full-gpl'
+  s.pod_target_xcconfig = {
+    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"'
+  }`
       );
 
       fs.writeFileSync(podspecPath, contents, 'utf8');
