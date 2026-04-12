@@ -1,14 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Dimensions, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, useWindowDimensions, Easing } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Play } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
-const { width, height } = Dimensions.get('window');
-
 // ─── BACKGROUND STARS ───
 const StarfieldBackground = () => {
+  const { width, height } = useWindowDimensions();
   const stars = useRef(
     Array.from({ length: 40 }).map(() => ({
       x: Math.random() * width,
@@ -70,6 +69,7 @@ const GlassCard: React.FC<{ children: React.ReactNode; style?: any }> = ({ child
 
 // ─── SLIDES ───
 const SlideHeroLaunch = () => {
+  const { width } = useWindowDimensions();
   const mascotX = useRef(new Animated.Value(-100)).current;
   const iconOp = useRef(new Animated.Value(0)).current;
   
@@ -251,6 +251,8 @@ const SLIDES = [SlideHeroLaunch, SlideBurstCount, SlideCountdown, SlideCardStack
 
 export const FeatureSlides: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const { t } = useTranslation();
+  const { height, width } = useWindowDimensions();
+  const isTablet = Math.min(width, height) >= 600;
   const [slideIndex, setSlideIndex] = useState(0);
   
   // Flash Animation
@@ -294,7 +296,7 @@ export const FeatureSlides: React.FC<{ onComplete: () => void }> = ({ onComplete
         <View style={[styles.progressBarSync, { width: `${((slideIndex + 1) / SLIDES.length) * 100}%` }]} />
       </View>
       
-      <View style={styles.slideArea}>
+      <View style={[styles.slideArea, { height: height * (isTablet ? 0.5 : 0.45) }]}>
         <CurrentSlide key={slideIndex} />
       </View>
 
@@ -337,7 +339,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFD166',
   },
   slideArea: {
-    height: height * 0.45,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,

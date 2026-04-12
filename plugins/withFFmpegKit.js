@@ -162,28 +162,65 @@ const withDownloadAAR = (config) =>
     },
   ]);
 
-// ─── 5. iOS: Podfile patch ────────────────────────────────────────────────────
+// ─── 5. iOS: ffmpeg-kit-react-native.podspec patch ───────────────────────────
+const withPatchFFmpegReactNativePodspec = (config) =>
+  withDangerousMod(config, [
+    'ios',
+    (cfg) => {
+      const podspecPath = path.join(
+        cfg.modRequest.projectRoot,
+        'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-react-native.podspec'
+      );
+
+      if (!fs.existsSync(podspecPath)) {
+        console.warn('[withFFmpegKit] ffmpeg-kit-react-native.podspec not found, skipping');
+        return cfg;
+      }
+
+      let contents = fs.readFileSync(podspecPath, 'utf8');
+
+      if (contents.includes('patched-by-withFFmpegKit')) {
+        console.log('[withFFmpegKit] ffmpeg-kit-react-native.podspec already patched ✓');
+        return cfg;
+      }
+
+      // source'u local path'e çevir
+      contents = contents.replace(
+        /s\.source\s*=\s*\{[^}]+\}/,
+        `s.source = { :path => '.' } # patched-by-withFFmpegKit`
+      );
+
+      // ffmpeg-kit-full-gpl bağımlılığından versiyon kısıtını kaldır
+      contents = contents.replace(
+        /s\.dependency\s+['"]ffmpeg-kit-full-gpl['"][^\n]*/,
+        `s.dependency 'ffmpeg-kit-full-gpl'`
+      );
+
+      fs.writeFileSync(podspecPath, contents, 'utf8');
+      console.log('[withFFmpegKit] Patched ffmpeg-kit-react-native.podspec ✓');
+      return cfg;
+    },
+  ]);
+
+// ─── 6. iOS: Podfile patch ────────────────────────────────────────────────────
 const withFFmpegKitIos = (config) =>
   withPodfile(config, (cfg) => {
     let contents = cfg.modResults.contents;
 
-    // Expo'nun otomatik eklediği import bloğunu temizle
     contents = contents.replace(
       /# @generated begin ffmpeg-kit-react-native-import[\s\S]*?# @generated end ffmpeg-kit-react-native-import\n?/m,
       ''
     );
 
-    // Eski tüm ffmpeg pod satırlarını temizle
     contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-ios-full-gpl['"].*\n?/g, '');
     contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-full-gpl['"][^,\n]*.*\n?/g, '');
     contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-react-native['"][^,\n]*.*\n?/g, '');
 
-    // Her iki pod da ios/ klasöründeki local podspec'lerden geliyor
     contents = contents.replace(
       /^(target\s+['"].*['"]\s+do)/m,
       `$1
-  pod 'ffmpeg-kit-full-gpl', :podspec => './ffmpeg-kit-full-gpl.podspec'
-  pod 'ffmpeg-kit-react-native', :podspec => './ffmpeg-kit-react-native.podspec'`
+  pod 'ffmpeg-kit-full-gpl', :path => '.'
+  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
     );
 
     cfg.modResults.contents = contents;
@@ -196,6 +233,7 @@ module.exports = (config) => {
   config = withAppBuildGradlePatch(config);
   config = withFFmpegKitBuildGradlePatch(config);
   config = withDownloadAAR(config);
+  config = withPatchFFmpegReactNativePodspec(config);
   config = withFFmpegKitIos(config);
   return config;
 };

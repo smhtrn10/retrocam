@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Crown, Play } from 'lucide-react-native';
+import { useDevice } from '@/hooks/useDevice';
 
 interface Props {
   onContinue: () => void;
@@ -10,6 +11,7 @@ interface Props {
 
 export const PremiumIntroScreen: React.FC<Props> = ({ onContinue }) => {
   const { t } = useTranslation();
+  const { isTablet } = useDevice();
   
   const titleOp = useRef(new Animated.Value(0)).current;
   const featuresAnims = useRef([
@@ -37,7 +39,7 @@ export const PremiumIntroScreen: React.FC<Props> = ({ onContinue }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingHorizontal: isTablet ? 80 : 24, maxWidth: isTablet ? 700 : undefined, alignSelf: 'center', width: '100%' }]}>
         <Animated.View style={[styles.header, { opacity: titleOp }]}>
           <Crown size={56} color="#FFD166" />
           <Text style={styles.title}>{t('premium_intro.title', 'Go Premium')}</Text>

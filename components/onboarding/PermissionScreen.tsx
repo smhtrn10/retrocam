@@ -10,12 +10,14 @@ import { Camera } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
+import { useDevice } from '@/hooks/useDevice';
 
 interface Props {
   onContinue: () => void;
 }
 
 export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
+  const { isTablet } = useDevice();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [libraryPermission, requestLibraryPermission] = MediaLibrary.usePermissions();
@@ -67,6 +69,8 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#181822', '#000000']} style={StyleSheet.absoluteFillObject} />
+
+      <View style={[styles.innerContent, { paddingHorizontal: isTablet ? 80 : 30, maxWidth: isTablet ? 600 : undefined, alignSelf: 'center', width: '100%' }]}>
 
       <View style={styles.iconWrap}>
         <View style={styles.iconCircle}>
@@ -136,6 +140,7 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
           <Text style={styles.continueBtnText}>Continue</Text>
         </TouchableOpacity>
       </Animated.View>
+      </View>
     </View>
   );
 };
@@ -144,8 +149,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 30,
     paddingTop: 80,
+  },
+  innerContent: {
+    flex: 1,
+    alignItems: 'center',
   },
   iconWrap: {
     marginBottom: 32,

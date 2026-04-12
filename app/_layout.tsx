@@ -34,10 +34,23 @@ function RootContent() {
   const { isOnboardingComplete, isLoading } = usePurchases();
 
   useEffect(() => {
-    // LY-3: yükleme tamamlanınca splash screen'i gizle
+    // LY-3: loading tamamlanınca splash screen'i gizle
+    // iPadOS beta kilitlenme riskine karşı safety timeout ekle
+    const safetyTimer = setTimeout(() => {
+      if (isLoading) {
+        console.warn('Splash screen safety timeout reached. Hiding splash screen regardless of isLoading state.');
+        SplashScreen.hideAsync().catch(() => {});
+      }
+    }, 5000);
+
     if (!isLoading) {
-      SplashScreen.hideAsync();
+      clearTimeout(safetyTimer);
+      SplashScreen.hideAsync().catch((e) => {
+        console.error('Failed to hide splash screen:', e);
+      });
     }
+
+    return () => clearTimeout(safetyTimer);
   }, [isLoading]);
 
   useEffect(() => {
@@ -83,6 +96,13 @@ function RootContent() {
         />
         <Stack.Screen
           name="video"
+          options={{
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="video-preview"
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',

@@ -1,0 +1,157 @@
+workflows:
+
+  # ─────────────────────────────────────────────
+  # iOS — App Store Release
+  # ─────────────────────────────────────────────
+  retrocam-ios-release:
+    name: RetroCam iOS Release
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20.0.0
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.retrocam.app"
+        XCODE_WORKSPACE: "ios/RetroCam.xcworkspace"
+        XCODE_SCHEME: "RetroCam"
+      groups:
+        - app_store_credentials  # APP_STORE_CONNECT_PRIVATE_KEY, KEY_IDENTIFIER, ISSUER_ID
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+      - name: Install Bun
+        script: |
+          curl -fsSL https://bun.sh/install | bash
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+
+      - name: Install dependencies
+        script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          bun install --frozen-lockfile
+
+      - name: Expo Prebuild (iOS) — applies withFFmpegKit plugin
+        script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install --repo-update
+
+      - name: Set build number from timestamp
+        script: |
+          BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          agvtool new-version -all $BUILD_NUMBER
+        working_directory: ios
+
+      - name: Build IPA
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+
+  # ─────────────────────────────────────────────
+  # Android — Release APK / AAB
+  # ─────────────────────────────────────────────
+  retrocam-android-release:
+    name: RetroCam Android Release
+    max_build_duration: 90
+    instance_type: linux_x2
+
+    environment:
+      node: 20.0.0
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.retrocam.app"
+      groups:
+        - google_play_credentials  # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS (optional)
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+      - name: Install Bun
+        script: |
+          curl -fsSL https://bun.sh/install | bash
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+
+      - name: Install dependencies
+        script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          bun install --frozen-lockfile
+
+      - name: Install Expo CLI
+        script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          bun add -g @expo/cli@latest
+
+      - name: Expo Prebuild (Android) — downloads AAR + patches build.gradle
+        script: |
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          npx expo prebuild --platform android --clean --no-install
+        environment:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+
+      - name: Verify ffmpeg-kit patch
+        script: |
+          echo "=== android/libs/ ==="
+          ls -lh android/libs/ || echo "libs dir missing!"
+          echo "=== ffmpeg-kit build.gradle ==="
+          grep -A4 "^dependencies {" node_modules/ffmpeg-kit-react-native/android/build.gradle
+
+      - name: Make Gradlew executable
+        script: chmod +x android/gradlew
+
+      - name: Build Release APK
+        script: |
+          cd android
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g" \
+            -Dorg.gradle.parallel=false
+        environment:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true

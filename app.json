@@ -15,7 +15,7 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.retrocam.app",
       "buildNumber": "2",
       "infoPlist": {
@@ -103,7 +103,7 @@
         "origin": "https://retrocam.com/"
       },
       "eas": {
-        "projectId": "76b32914-4a2e-4223-900a-6f52286ad17d"
+        "projectId": "895dd9ed-d49d-4f15-a412-7987f7da3e49"
       }
     }
   }
