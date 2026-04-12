@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'ffmpeg-kit-full-gpl'
-  s.version          = '6.0'
+  s.version          = '6.0.2'
   s.summary          = 'FFmpeg Kit Full GPL'
   s.homepage         = 'https://github.com/arthenica/ffmpeg-kit'
   s.license          = { :type => 'LGPL-3.0', :file => 'LICENSE' }

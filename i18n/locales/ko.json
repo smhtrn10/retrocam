@@ -61,7 +61,7 @@
     "per_year": "/year",
     "best_value": "Best Value",
     "restore": "Restore Purchase",
-    "trial": "3일 무료 체험",
+    "trial": "계속하기",
     "trial_badge": "3일 무료",
     "trial_then": "이후 {{price}}/년",
     "then": "then {{price}} {{period}}",

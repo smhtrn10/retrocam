@@ -61,7 +61,7 @@
     "per_year": "/year",
     "best_value": "Best Value",
     "restore": "Restore Purchase",
-    "trial": "Try Free for 3 Days",
+    "trial": "Continue",
     "trial_badge": "3-Day Free Trial",
     "trial_then": "then {{price}}/year",
     "then": "then {{price}} {{period}}",
