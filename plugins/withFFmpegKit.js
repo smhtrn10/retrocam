@@ -7,39 +7,33 @@ const {
 const path = require('path');
 const fs = require('fs');
 
-// Self-hosted AAR (NooruddinLakhani's mirror of arthenica/ffmpeg-kit v6.0)
 const AAR_URL =
   'https://github.com/NooruddinLakhani/ffmpeg-kit-full-gpl/releases/download/v1.0.0/ffmpeg-kit-full-gpl.aar';
 const AAR_FILENAME = 'ffmpeg-kit-full-gpl.aar';
 
-// ─── 1. Root build.gradle: add flatDir to ALL repositories blocks ─────────────
+// ─── 1. Root build.gradle ─────────────────────────────────────────────────────
 const withRootBuildGradle = (config) =>
   withProjectBuildGradle(config, (cfg) => {
     let gradle = cfg.modResults.contents;
-
     gradle = gradle.replace(/\n?\s*ffmpegKitPackage\s*=\s*["'].*["']\n?/g, '\n');
-
     if (!gradle.includes('ffmpeg-kit-full-gpl')) {
       gradle = gradle.replace(/repositories\s*\{/g, (match) =>
         match + `\n        flatDir { dirs "$rootDir/libs" }`
       );
     }
-
     cfg.modResults.contents = gradle;
     return cfg;
   });
 
-// ─── 2. app/build.gradle: add flatDir repo + local AAR dependency ────────────
+// ─── 2. app/build.gradle ─────────────────────────────────────────────────────
 const withAppBuildGradlePatch = (config) =>
   withAppBuildGradle(config, (cfg) => {
     let gradle = cfg.modResults.contents;
-
-    if (gradle.includes('ffmpeg-kit-full-gpl')) {
-      return cfg;
-    }
+    if (gradle.includes('ffmpeg-kit-full-gpl')) return cfg;
 
     if (gradle.match(/^repositories\s*\{/m)) {
-      gradle = gradle.replace(/^(repositories\s*\{)/m,
+      gradle = gradle.replace(
+        /^(repositories\s*\{)/m,
         `$1\n    flatDir { dirs "$rootDir/libs" }`
       );
     } else {
@@ -58,7 +52,7 @@ const withAppBuildGradlePatch = (config) =>
     return cfg;
   });
 
-// ─── 3. Patch ffmpeg-kit-react-native/android/build.gradle ───────────────────
+// ─── 3. ffmpeg-kit-react-native/android/build.gradle ─────────────────────────
 const withFFmpegKitBuildGradlePatch = (config) =>
   withDangerousMod(config, [
     'android',
@@ -105,7 +99,7 @@ const withFFmpegKitBuildGradlePatch = (config) =>
     },
   ]);
 
-// ─── 4. Download AAR into android/libs/ ──────────────────────────────────────
+// ─── 4. Download AAR ──────────────────────────────────────────────────────────
 const withDownloadAAR = (config) =>
   withDangerousMod(config, [
     'android',
@@ -113,14 +107,12 @@ const withDownloadAAR = (config) =>
       const libsDir = path.join(cfg.modRequest.projectRoot, 'android', 'libs');
       const aarDest = path.join(libsDir, AAR_FILENAME);
 
-      if (!fs.existsSync(libsDir)) {
-        fs.mkdirSync(libsDir, { recursive: true });
-      }
+      if (!fs.existsSync(libsDir)) fs.mkdirSync(libsDir, { recursive: true });
 
       if (fs.existsSync(aarDest)) {
         const size = fs.statSync(aarDest).size;
         if (size > 1000000) {
-          console.log(`[withFFmpegKit] ${AAR_FILENAME} already present (${(size/1024/1024).toFixed(1)}MB), skipping`);
+          console.log(`[withFFmpegKit] ${AAR_FILENAME} already present (${(size / 1024 / 1024).toFixed(1)}MB), skipping`);
           return cfg;
         }
         fs.unlinkSync(aarDest);
@@ -141,24 +133,24 @@ const withDownloadAAR = (config) =>
           proto.get(url, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
               file.close();
-              try { fs.unlinkSync(dest); } catch (_) {}
+              try { fs.unlinkSync(dest); } catch (_) { }
               return get(res.headers.location, dest, redirects + 1);
             }
             if (res.statusCode !== 200) {
               file.close();
-              try { fs.unlinkSync(dest); } catch (_) {}
+              try { fs.unlinkSync(dest); } catch (_) { }
               return reject(new Error(`HTTP ${res.statusCode} from ${url}`));
             }
             res.pipe(file);
             file.on('finish', () => {
               file.close(() => {
                 const size = fs.statSync(dest).size;
-                console.log(`[withFFmpegKit] Downloaded ${AAR_FILENAME} (${(size/1024/1024).toFixed(1)}MB) ✓`);
+                console.log(`[withFFmpegKit] Downloaded ${AAR_FILENAME} (${(size / 1024 / 1024).toFixed(1)}MB) ✓`);
                 resolve();
               });
             });
           }).on('error', (err) => {
-            try { fs.unlinkSync(dest); } catch (_) {}
+            try { fs.unlinkSync(dest); } catch (_) { }
             reject(err);
           });
         }
@@ -175,84 +167,28 @@ const withFFmpegKitIos = (config) =>
   withPodfile(config, (cfg) => {
     let contents = cfg.modResults.contents;
 
+    // Expo'nun otomatik eklediği import bloğunu temizle
     contents = contents.replace(
       /# @generated begin ffmpeg-kit-react-native-import[\s\S]*?# @generated end ffmpeg-kit-react-native-import\n?/m,
       ''
     );
 
+    // Eski tüm ffmpeg pod satırlarını temizle
     contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-ios-full-gpl['"].*\n?/g, '');
+    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-full-gpl['"][^,\n]*.*\n?/g, '');
+    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-react-native['"][^,\n]*.*\n?/g, '');
 
-    if (
-      !contents.includes("pod 'ffmpeg-kit-full-gpl'") &&
-      !contents.includes('pod "ffmpeg-kit-full-gpl"')
-    ) {
-      contents = contents.replace(
-        /^(target\s+['"].*['"]\s+do)/m,
-        `$1\n  pod 'ffmpeg-kit-full-gpl', :path => '../node_modules/ffmpeg-kit-react-native'\n  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
-      );
-    }
+    // Her iki pod da ios/ klasöründeki local podspec'lerden geliyor
+    contents = contents.replace(
+      /^(target\s+['"].*['"]\s+do)/m,
+      `$1
+  pod 'ffmpeg-kit-full-gpl', :podspec => './ffmpeg-kit-full-gpl.podspec'
+  pod 'ffmpeg-kit-react-native', :podspec => './ffmpeg-kit-react-native.podspec'`
+    );
 
     cfg.modResults.contents = contents;
     return cfg;
   });
-
-// ─── 6. iOS: ffmpeg-kit-full-gpl.podspec patch ───────────────────────────────
-// bun install her çalıştığında node_modules üzerine yazılır.
-// Bu adım prebuild sırasında podspec'i semihtrn4 zip'ine yönlendirir.
-// semihtrn4 zip'i 611 header içeriyor (FFmpegKitConfig.h dahil) — jdarshan5 içermiyor.
-// Zip içi yapı: ffmpeg-kit-ios-full-gpl/6.0-80adc/<framework>.xcframework
-const withPatchFFmpegPodspec = (config) =>
-  withDangerousMod(config, [
-    'ios',
-    (cfg) => {
-      const podspecPath = path.join(
-        cfg.modRequest.projectRoot,
-        'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-full-gpl.podspec'
-      );
-
-      if (!fs.existsSync(podspecPath)) {
-        console.warn('[withFFmpegKit] ffmpeg-kit-full-gpl.podspec not found, skipping');
-        return cfg;
-      }
-
-      let contents = fs.readFileSync(podspecPath, 'utf8');
-
-      const newUrl =
-        'https://github.com/semihtrn4/ffmpeg-kit-ios-full-gpl/releases/download/latest/ffmpeg-kit-ios-full-gpl-latest.zip';
-      const subdir = 'ffmpeg-kit-ios-full-gpl-latest/ffmpeg-kit-ios-full-gpl/6.0-80adc';
-
-      // Zaten patch'lendiyse tekrar işlem yapma
-      if (contents.includes('semihtrn4')) {
-        console.log('[withFFmpegKit] ffmpeg-kit-full-gpl.podspec already patched ✓');
-        return cfg;
-      }
-
-      // URL'i güncelle
-      contents = contents.replace(
-        /s\.source\s*=\s*\{[^}]+\}/,
-        `s.source = { :http => "${newUrl}" }`
-      );
-
-      // vendored_frameworks path'lerini zip içi alt klasörle güncelle
-      contents = contents.replace(
-        /s\.vendored_frameworks\s*=\s*\[[\s\S]*?\]/,
-        `s.vendored_frameworks = [
-    "${subdir}/ffmpegkit.xcframework",
-    "${subdir}/libavcodec.xcframework",
-    "${subdir}/libavdevice.xcframework",
-    "${subdir}/libavfilter.xcframework",
-    "${subdir}/libavformat.xcframework",
-    "${subdir}/libavutil.xcframework",
-    "${subdir}/libswresample.xcframework",
-    "${subdir}/libswscale.xcframework",
-  ]`
-      );
-
-      fs.writeFileSync(podspecPath, contents, 'utf8');
-      console.log('[withFFmpegKit] Patched ffmpeg-kit-full-gpl.podspec → semihtrn4 zip ✓');
-      return cfg;
-    },
-  ]);
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 module.exports = (config) => {
@@ -261,6 +197,5 @@ module.exports = (config) => {
   config = withFFmpegKitBuildGradlePatch(config);
   config = withDownloadAAR(config);
   config = withFFmpegKitIos(config);
-  config = withPatchFFmpegPodspec(config); // ← YENİ: podspec'i semihtrn4 zip'ine yönlendirir
   return config;
 };
