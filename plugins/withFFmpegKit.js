@@ -11,6 +11,12 @@ const AAR_URL =
   'https://github.com/NooruddinLakhani/ffmpeg-kit-full-gpl/releases/download/v1.0.0/ffmpeg-kit-full-gpl.aar';
 const AAR_FILENAME = 'ffmpeg-kit-full-gpl.aar';
 
+// iOS: semihtrn4 zip — verified to contain 611 headers including FFmpegKitConfig.h
+const IOS_ZIP_URL =
+  'https://github.com/semihtrn4/ffmpeg-kit-ios-full-gpl/releases/download/latest/ffmpeg-kit-ios-full-gpl-flat.zip';
+// Flat zip — no subdirectory, xcframeworks are at root level (verified)
+const IOS_SUBDIR = '';
+
 // ─── 1. Root build.gradle ─────────────────────────────────────────────────────
 const withRootBuildGradle = (config) =>
   withProjectBuildGradle(config, (cfg) => {
@@ -71,7 +77,7 @@ const withFFmpegKitBuildGradlePatch = (config) =>
       const localDep = `implementation(name: 'ffmpeg-kit-full-gpl', ext: 'aar')`;
 
       if (contents.includes(localDep)) {
-        console.log('[withFFmpegKit] build.gradle already patched');
+        console.log('[withFFmpegKit] Android build.gradle already patched');
         return cfg;
       }
 
@@ -94,12 +100,12 @@ const withFFmpegKitBuildGradlePatch = (config) =>
       }
 
       fs.writeFileSync(ffmpegBuildGradle, patched, 'utf8');
-      console.log('[withFFmpegKit] Patched ffmpeg-kit-react-native build.gradle ✓');
+      console.log('[withFFmpegKit] Patched Android build.gradle ✓');
       return cfg;
     },
   ]);
 
-// ─── 4. Download AAR ──────────────────────────────────────────────────────────
+// ─── 4. Download AAR into android/libs/ ──────────────────────────────────────
 const withDownloadAAR = (config) =>
   withDangerousMod(config, [
     'android',
@@ -162,50 +168,93 @@ const withDownloadAAR = (config) =>
     },
   ]);
 
-// ─── 5. iOS: Podfile patch + podspec patch ────────────────────────────────────
+// ─── 5. iOS: Patch ffmpeg-kit-full-gpl.podspec → semihtrn4 zip ───────────────
+// semihtrn4 zip contains 611 headers including FFmpegKitConfig.h (verified).
+// jdarshan5 zip does NOT contain headers → causes 'FFmpegKitConfig.h not found'.
+// NOTE: We patch inside android dangerousMod because it always runs regardless
+// of whether ios/ folder exists. The podspec file is in node_modules (shared).
+const withPatchFFmpegPodspec = (config) =>
+  withDangerousMod(config, [
+    'android',
+    (cfg) => {
+      const podspecPath = path.join(
+        cfg.modRequest.projectRoot,
+        'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-full-gpl.podspec'
+      );
+
+      if (!fs.existsSync(podspecPath)) {
+        console.warn('[withFFmpegKit] ffmpeg-kit-full-gpl.podspec not found, skipping');
+        return cfg;
+      }
+
+      let contents = fs.readFileSync(podspecPath, 'utf8');
+
+      if (contents.includes('semihtrn4')) {
+        console.log('[withFFmpegKit] ffmpeg-kit-full-gpl.podspec already patched ✓');
+        return cfg;
+      }
+
+      // Replace source URL → semihtrn4 zip (has headers)
+      contents = contents.replace(
+        /s\.source\s*=\s*\{[^}]+\}/,
+        `s.source = { :http => "${IOS_ZIP_URL}" }`
+      );
+
+      // Replace vendored_frameworks paths → flat zip has no subdirectory
+      contents = contents.replace(
+        /s\.vendored_frameworks\s*=\s*\[[\s\S]*?\]/,
+        `s.vendored_frameworks = [
+    "ffmpegkit.xcframework",
+    "libavcodec.xcframework",
+    "libavdevice.xcframework",
+    "libavfilter.xcframework",
+    "libavformat.xcframework",
+    "libavutil.xcframework",
+    "libswresample.xcframework",
+    "libswscale.xcframework",
+  ]`
+      );
+
+      // Add HEADER_SEARCH_PATHS so FFmpegKitConfig.h is found at compile time
+      if (!contents.includes('HEADER_SEARCH_PATHS')) {
+        contents = contents.replace(
+          /s\.static_framework\s*=\s*true/,
+          `s.static_framework = true
+
+  s.xcconfig = {
+    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"'
+  }`
+        );
+      }
+
+      fs.writeFileSync(podspecPath, contents, 'utf8');
+      console.log('[withFFmpegKit] Patched ffmpeg-kit-full-gpl.podspec → semihtrn4 zip ✓');
+      return cfg;
+    },
+  ]);
+
+// ─── 6. iOS: Podfile patch ────────────────────────────────────────────────────
+// Use :path => node_modules/ffmpeg-kit-react-native for BOTH pods.
+// CocoaPods reads ffmpeg-kit-full-gpl.podspec from there (now patched to semihtrn4 zip).
 const withFFmpegKitIos = (config) =>
   withPodfile(config, (cfg) => {
-    // Podspec patch burada yap
-    const podspecPath = path.join(
-      cfg.modRequest.projectRoot,
-      'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-react-native.podspec'
-    );
-
-    if (fs.existsSync(podspecPath)) {
-      let podspec = fs.readFileSync(podspecPath, 'utf8');
-      if (!podspec.includes('patched-by-withFFmpegKit')) {
-        podspec = podspec.replace(
-          /s\.source\s*=\s*\{[^}]+\}/,
-          `s.source = { :path => '.' } # patched-by-withFFmpegKit`
-        );
-        podspec = podspec.replace(
-          /s\.dependency\s+['"]ffmpeg-kit-full-gpl['"][^\n]*/,
-          `s.dependency 'ffmpeg-kit-full-gpl'\n  s.pod_target_xcconfig = { 'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"' }`
-        );
-        fs.writeFileSync(podspecPath, podspec, 'utf8');
-        console.log('[withFFmpegKit] Patched ffmpeg-kit-react-native.podspec ✓');
-      } else {
-        console.log('[withFFmpegKit] ffmpeg-kit-react-native.podspec already patched ✓');
-      }
-    }
-
-    // Podfile patch
     let contents = cfg.modResults.contents;
 
+    // Remove autolinking entry
     contents = contents.replace(
       /# @generated begin ffmpeg-kit-react-native-import[\s\S]*?# @generated end ffmpeg-kit-react-native-import\n?/m,
       ''
     );
 
+    // Remove any old/conflicting ffmpeg pod entries
     contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-ios-full-gpl['"].*\n?/g, '');
-    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-full-gpl['"][^,\n]*.*\n?/g, '');
-    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-react-native['"][^,\n]*.*\n?/g, '');
+    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-full-gpl['"].*\n?/g, '');
+    contents = contents.replace(/\n?\s*pod ['"]ffmpeg-kit-react-native['"].*\n?/g, '');
 
+    // Add correct pods
     contents = contents.replace(
       /^(target\s+['"].*['"]\s+do)/m,
-      `$1
-  pod 'ffmpeg-kit-full-gpl', :path => '..'
-  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
+      `$1\n  pod 'ffmpeg-kit-full-gpl', :path => '../node_modules/ffmpeg-kit-react-native'\n  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
     );
 
     cfg.modResults.contents = contents;
@@ -218,6 +267,7 @@ module.exports = (config) => {
   config = withAppBuildGradlePatch(config);
   config = withFFmpegKitBuildGradlePatch(config);
   config = withDownloadAAR(config);
-  config = withFFmpegKitIos(config);
+  config = withPatchFFmpegPodspec(config); // ← patches podspec to semihtrn4 zip (has headers)
+  config = withFFmpegKitIos(config);       // ← patches Podfile with correct :path =>
   return config;
 };

@@ -75,13 +75,15 @@ export default function PaywallScreen() {
   const isAnnualSelected = selectedPkg?.packageType === 'ANNUAL';
 
   const getButtonLabel = () => {
-    if (isAnnualSelected) return t('paywall.trial', 'Try Free for 3 Days');
+    if (isAnnualSelected && selectedPkg) {
+      return t('paywall.trial', 'Start Free Trial', { price: selectedPkg.product.priceString });
+    }
     return t('onboarding.continue', 'Continue');
   };
 
   const getTrialDisclaimer = () => {
-    if (isAnnualSelected) {
-      return t('paywall.trial_disclaimer', '3-day free trial. Renews automatically unless cancelled.');
+    if (isAnnualSelected && selectedPkg) {
+      return t('paywall.trial_disclaimer', 'Billed as {{price}}/year after 3-day free trial. Cancel anytime.', { price: selectedPkg.product.priceString });
     }
     return '';
   };
@@ -351,12 +353,13 @@ const styles = StyleSheet.create({
   },
   trialBadgeText: {
     color: '#FFD166',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
   },
   planPrice: {
     color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
+    fontSize: 20,
+    fontWeight: '700',
     marginTop: 4,
   },
   planPriceActive: {
