@@ -162,52 +162,34 @@ const withDownloadAAR = (config) =>
     },
   ]);
 
-// ─── 5. iOS: ffmpeg-kit-react-native.podspec patch ───────────────────────────
-const withPatchFFmpegReactNativePodspec = (config) =>
-  withDangerousMod(config, [
-    'ios',
-    (cfg) => {
-      const podspecPath = path.join(
-        cfg.modRequest.projectRoot,
-        'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-react-native.podspec'
-      );
-
-      if (!fs.existsSync(podspecPath)) {
-        console.warn('[withFFmpegKit] ffmpeg-kit-react-native.podspec not found, skipping');
-        return cfg;
-      }
-
-      let contents = fs.readFileSync(podspecPath, 'utf8');
-
-      if (contents.includes('patched-by-withFFmpegKit')) {
-        console.log('[withFFmpegKit] ffmpeg-kit-react-native.podspec already patched ✓');
-        return cfg;
-      }
-
-      // source'u local path'e çevir
-      contents = contents.replace(
-        /s\.source\s*=\s*\{[^}]+\}/,
-        `s.source = { :path => '.' } # patched-by-withFFmpegKit`
-      );
-
-      // versiyon kısıtını kaldır + header search path ekle
-      contents = contents.replace(
-        /s\.dependency\s+['"]ffmpeg-kit-full-gpl['"][^\n]*/,
-        `s.dependency 'ffmpeg-kit-full-gpl'
-  s.pod_target_xcconfig = {
-    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"'
-  }`
-      );
-
-      fs.writeFileSync(podspecPath, contents, 'utf8');
-      console.log('[withFFmpegKit] Patched ffmpeg-kit-react-native.podspec ✓');
-      return cfg;
-    },
-  ]);
-
-// ─── 6. iOS: Podfile patch ────────────────────────────────────────────────────
+// ─── 5. iOS: Podfile patch + podspec patch ────────────────────────────────────
 const withFFmpegKitIos = (config) =>
   withPodfile(config, (cfg) => {
+    // Podspec patch burada yap
+    const podspecPath = path.join(
+      cfg.modRequest.projectRoot,
+      'node_modules/ffmpeg-kit-react-native/ffmpeg-kit-react-native.podspec'
+    );
+
+    if (fs.existsSync(podspecPath)) {
+      let podspec = fs.readFileSync(podspecPath, 'utf8');
+      if (!podspec.includes('patched-by-withFFmpegKit')) {
+        podspec = podspec.replace(
+          /s\.source\s*=\s*\{[^}]+\}/,
+          `s.source = { :path => '.' } # patched-by-withFFmpegKit`
+        );
+        podspec = podspec.replace(
+          /s\.dependency\s+['"]ffmpeg-kit-full-gpl['"][^\n]*/,
+          `s.dependency 'ffmpeg-kit-full-gpl'\n  s.pod_target_xcconfig = { 'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"' }`
+        );
+        fs.writeFileSync(podspecPath, podspec, 'utf8');
+        console.log('[withFFmpegKit] Patched ffmpeg-kit-react-native.podspec ✓');
+      } else {
+        console.log('[withFFmpegKit] ffmpeg-kit-react-native.podspec already patched ✓');
+      }
+    }
+
+    // Podfile patch
     let contents = cfg.modResults.contents;
 
     contents = contents.replace(
@@ -236,7 +218,6 @@ module.exports = (config) => {
   config = withAppBuildGradlePatch(config);
   config = withFFmpegKitBuildGradlePatch(config);
   config = withDownloadAAR(config);
-  config = withPatchFFmpegReactNativePodspec(config);
   config = withFFmpegKitIos(config);
   return config;
 };
