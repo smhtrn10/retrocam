@@ -21,4 +21,7 @@ Pod::Spec.new do |s|
 
   s.header_dir          = 'ffmpegkit'
   s.preserve_paths      = ['**/*.xcframework/**']
+  s.pod_target_xcconfig = {
+    'HEADER_SEARCH_PATHS' => '$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers'
+  }
 end
