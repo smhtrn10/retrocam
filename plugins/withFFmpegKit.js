@@ -219,7 +219,7 @@ const withFFmpegKitIos = (config) =>
     contents = contents.replace(
       /^(target\s+['"].*['"]\s+do)/m,
       `$1
-  pod 'ffmpeg-kit-full-gpl', :path => '../ios'
+  pod 'ffmpeg-kit-full-gpl', :path => '..'
   pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
     );
 
