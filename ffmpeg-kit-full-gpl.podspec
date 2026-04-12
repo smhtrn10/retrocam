@@ -19,9 +19,10 @@ Pod::Spec.new do |s|
     'libswscale.xcframework',
   ]
 
-  s.header_dir          = 'ffmpegkit'
-  s.preserve_paths      = ['**/*.xcframework/**']
-  s.pod_target_xcconfig = {
-    'HEADER_SEARCH_PATHS' => '$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers'
+  s.preserve_paths = ['**/*.xcframework/**']
+
+  s.xcconfig = {
+    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64/ffmpegkit.framework/Headers" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator/ffmpegkit.framework/Headers"',
+    'FRAMEWORK_SEARCH_PATHS' => '"$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64" "$(PODS_ROOT)/ffmpeg-kit-full-gpl/ffmpegkit.xcframework/ios-arm64_x86_64-simulator"'
   }
 end
