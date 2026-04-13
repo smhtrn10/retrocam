@@ -1,0 +1,32 @@
+name: Verify iOS Podfile & Prebuild
+
+on:
+  workflow_dispatch: # Allows you to trigger this workflow manually from GitHub Actions tab
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  test-ios-pods:
+    name: Test iOS Prebuild and Pod Install
+    runs-on: macos-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install NPM dependencies
+        run: npm install
+
+      - name: 🏗️ Run Expo Prebuild (iOS)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: 🍏 Install CocoaPods (Test Podfile logic)
+        working-directory: ./ios
+        run: pod install

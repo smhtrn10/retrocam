@@ -77,6 +77,11 @@
     "benefit_5": "Exclusive golden hour features",
     "benefit_6": "Cancel anytime"
   },
+  "permission": {
+    "title": "Accesso richiesto",
+    "subtitle": "RetroCam ha bisogno di accedere alla fotocamera, al microfono e alla galleria.",
+    "requesting": "Richiesta in corso..."
+  },
   "free_limit": {
     "title": "Switching to Free Mode",
     "desc": "In free mode, you can only use 3 cameras. Upgrade to Pro to unlock everything."

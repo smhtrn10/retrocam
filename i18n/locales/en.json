@@ -77,6 +77,11 @@
     "benefit_5": "Exclusive golden hour features",
     "benefit_6": "Cancel anytime"
   },
+  "permission": {
+    "title": "Access Required",
+    "subtitle": "RetroCam needs access to your camera, microphone, and gallery to capture and save retro-style photos and videos.",
+    "requesting": "Requesting..."
+  },
   "free_limit": {
     "title": "Switching to Free Mode",
     "desc": "In free mode, you can only use 3 cameras. Upgrade to Pro to unlock everything."

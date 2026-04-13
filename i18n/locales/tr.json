@@ -77,6 +77,11 @@
     "benefit_5": "Özel altın saat özellikleri",
     "benefit_6": "İstediğin zaman iptal et"
   },
+  "permission": {
+    "title": "Erişim Gerekli",
+    "subtitle": "RetroCam, retro tarzı fotoğraf ve video çekmek için kamera, mikrofon ve galeriye erişim gerektirir.",
+    "requesting": "İsteniyor..."
+  },
   "free_limit": {
     "title": "Ücretsiz Moda Geçiliyor",
     "desc": "Ücretsiz modda sadece 3 kamera kullanabilirsiniz. Tüm kameralar için Pro'ya geçin."

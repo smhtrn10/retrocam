@@ -175,7 +175,7 @@ const withDownloadAAR = (config) =>
 // of whether ios/ folder exists. The podspec file is in node_modules (shared).
 const withPatchFFmpegPodspec = (config) =>
   withDangerousMod(config, [
-    'android',
+    'ios',
     (cfg) => {
       const podspecPath = path.join(
         cfg.modRequest.projectRoot,
@@ -254,7 +254,7 @@ const withFFmpegKitIos = (config) =>
     // Add correct pods
     contents = contents.replace(
       /^(target\s+['"].*['"]\s+do)/m,
-      `$1\n  pod 'ffmpeg-kit-full-gpl', :path => '../node_modules/ffmpeg-kit-react-native'\n  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
+      `$1\n  pod 'ffmpeg-kit-full-gpl', :podspec => '../node_modules/ffmpeg-kit-react-native/ffmpeg-kit-full-gpl.podspec'\n  pod 'ffmpeg-kit-react-native', :path => '../node_modules/ffmpeg-kit-react-native'`
     );
 
     cfg.modResults.contents = contents;

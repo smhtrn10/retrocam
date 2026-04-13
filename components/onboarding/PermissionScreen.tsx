@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { useDevice } from '@/hooks/useDevice';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   onContinue: () => void;
@@ -18,6 +19,7 @@ interface Props {
 
 export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
   const { isTablet } = useDevice();
+  const { t } = useTranslation();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [libraryPermission, requestLibraryPermission] = MediaLibrary.usePermissions();
@@ -78,10 +80,8 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
         </View>
       </View>
 
-      <Text style={styles.title}>Access Required</Text>
-      <Text style={styles.subtitle}>
-        RetroCam needs access to your camera, microphone, and gallery to capture and save retro-style photos and videos.
-      </Text>
+      <Text style={styles.title}>{t('permission.title', 'Access Required')}</Text>
+      <Text style={styles.subtitle}>{t('permission.subtitle', 'RetroCam needs access to your camera, microphone, and gallery to capture and save retro-style photos and videos.')}</Text>
 
       <View style={styles.permissionList}>
         <View style={styles.permRow}>
@@ -125,7 +125,7 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
           disabled={loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.allowBtnText}>{loading ? 'Requesting...' : 'Allow Access'}</Text>
+          <Text style={styles.allowBtnText}>{loading ? t('permission.requesting', 'Requesting...') : t('onboarding.continue', 'Continue')}</Text>
         </TouchableOpacity>
       )}
 
@@ -137,7 +137,7 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
           disabled={!granted}
           activeOpacity={0.8}
         >
-          <Text style={styles.continueBtnText}>Continue</Text>
+          <Text style={styles.continueBtnText}>{t('onboarding.continue', 'Continue')}</Text>
         </TouchableOpacity>
       </Animated.View>
       </View>
