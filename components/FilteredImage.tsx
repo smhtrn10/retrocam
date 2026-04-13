@@ -20,7 +20,6 @@ import {
   vec,
   useCanvasRef,
   ImageFormat,
-  ClipOp,
 } from '@shopify/react-native-skia';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CameraPreset } from '@/constants/presets';
@@ -189,7 +188,7 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   const sprocketHoles = (side: 'left' | 'right', sw: number) => {
     const sx = side === 'left' ? 0 : width - sw;
     return Array.from({ length: 10 }).map((_, i) => (
-      <Rect key={`sp${side}${i}`}
+      <RoundedRect key={`sp${side}${i}`}
         x={sx + 3} y={i * (height / 10) + 3}
         width={sw - 6} height={height / 10 - 6}
         r={2} color="#222" />
@@ -249,10 +248,10 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
           <Rect x={halfW + 4} y={0} width={4} height={height} color="#111" />
           {/* Sprocket holes */}
           {Array.from({ length: 8 }).map((_, i) => (
-            <Rect key={`hl${i}`} x={2} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
+            <RoundedRect key={`hl${i}`} x={2} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
           ))}
           {Array.from({ length: 8 }).map((_, i) => (
-            <Rect key={`hr${i}`} x={width - 10} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
+            <RoundedRect key={`hr${i}`} x={width - 10} y={i * (height / 8) + 4} width={8} height={height / 8 - 8} r={2} color="#1A1A1A" />
           ))}
         </Canvas>
         {timestampEl}
@@ -295,7 +294,7 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
       <View style={{ width, height, backgroundColor: '#000' }}>
         <Canvas ref={canvasRef} style={{ position: 'absolute', width, height }}>
           <Rect x={0} y={0} width={width} height={height} color="#000" />
-          <Group clip={<Circle cx={cx} cy={cy} r={fishR} />}>
+          <Group clip={{ x: cx - fishR, y: cy - fishR, width: fishR * 2, height: fishR * 2 }}>
             {imageLayer(cx - fishR, cy - fishR, fishR * 2, fishR * 2)}
             {effectLayer(cx - fishR, cy - fishR, fishR * 2, fishR * 2)}
           </Group>
