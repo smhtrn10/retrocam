@@ -122,13 +122,18 @@
     }
   },
   "camera_types": {
-    "disposable": "Disposable",
-    "modern": "Modern",
+    "disposable": "일회용",
+    "modern": "모던",
     "vhs": "VHS",
-    "120": "120 Format",
-    "8mm": "8mm Cinema",
-    "digital-y2k": "Y2K Digital",
-    "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "120": "120 포맷",
+    "8mm": "8mm 시네마",
+    "digital-y2k": "Y2K 디지털",
+    "half-frame": "하프 프레임",
+    "b-w": "흑백",
+    "35mm": "35mm 필름",
+    "instant": "인스턴트",
+    "16mm": "16mm 시네마",
+    "camcorder": "캠코더",
+    "special": "스페셜"
   }
 }

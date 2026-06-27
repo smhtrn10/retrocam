@@ -129,6 +129,11 @@
     "8mm": "8mm Cinema",
     "digital-y2k": "Y2K Digital",
     "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "b-w": "Black & White",
+    "35mm": "35mm Film",
+    "instant": "Instant",
+    "16mm": "16mm Cinema",
+    "camcorder": "Camcorder",
+    "special": "Special"
   }
 }

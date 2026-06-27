@@ -50,6 +50,9 @@ export default function CameraScreen() {
   const [aspectRatio, setAspectRatio] = useState<'full' | '1:1' | '3:2' | '4:5'>('full');
   const [isSnapMode, setIsSnapMode] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  
+  const [isDoubleExposureMode, setIsDoubleExposureMode] = useState(false);
+  const [doubleExposureFirstPhoto, setDoubleExposureFirstPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
@@ -140,26 +143,51 @@ export default function CameraScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
       if (photo && isMounted.current) {
-        router.push({
-          pathname: '/preview',
-          params: { uri: photo.uri, presetId: selectedPreset.id },
-        });
+        if (isDoubleExposureMode) {
+          if (!doubleExposureFirstPhoto) {
+            setDoubleExposureFirstPhoto(photo.uri);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } else {
+            const firstPhoto = doubleExposureFirstPhoto;
+            setDoubleExposureFirstPhoto(null);
+            router.push({
+              pathname: '/preview',
+              params: { uri: photo.uri, secondaryUri: firstPhoto, presetId: selectedPreset.id },
+            });
+          }
+        } else {
+          router.push({
+            pathname: '/preview',
+            params: { uri: photo.uri, presetId: selectedPreset.id },
+          });
+        }
       }
     } catch (error) {
       console.error('Capture error:', error);
     } finally {
       if (isMounted.current) setIsCapturing(false);
     }
-  }, [isCapturing, selectedPreset]);
+  }, [isCapturing, selectedPreset, isDoubleExposureMode, doubleExposureFirstPhoto]);
 
   const handleGalleryImport = useCallback(async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 1 });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        quality: 1,
+      });
       if (!result.canceled && result.assets[0] && isMounted.current) {
-        router.push({
-          pathname: '/preview',
-          params: { uri: result.assets[0].uri, presetId: selectedPreset.id, isImport: 'true' },
-        });
+        const asset = result.assets[0];
+        if (asset.type === 'video') {
+          router.push({
+            pathname: '/video-preview',
+            params: { uri: encodeURIComponent(asset.uri), presetId: selectedPreset.id },
+          });
+        } else {
+          router.push({
+            pathname: '/preview',
+            params: { uri: asset.uri, presetId: selectedPreset.id, isImport: 'true' },
+          });
+        }
       }
     } catch (error) {
       console.error('Gallery import error:', error);
@@ -214,49 +242,92 @@ export default function CameraScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* ── Camera ── */}
-      <View style={[styles.cameraContainer, { backgroundColor: '#000', justifyContent: 'center' }]}>
-        <View style={{ width: cameraSize.width, height: cameraSize.height, overflow: 'hidden', alignSelf: 'center', borderRadius: isTablet ? 12 : 0 }}>
-          {isCameraActive && (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              mode="picture"
-              responsiveOrientationWhenOrientationLocked
-            />
-          )}
-        </View>
+      <View style={[styles.cameraContainer, { backgroundColor: '#161616', justifyContent: 'center' }]}>
+        <View style={styles.skeuoLeatherTexture} />
+        
+        <View style={[styles.viewfinderFrame, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }]}>
+          <View style={{ flex: 1, overflow: 'hidden', borderRadius: 12, borderWidth: 4, borderColor: '#2E2E2E', position: 'relative' }}>
+            {isCameraActive && (
+              <CameraView
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                facing={facing}
+                mode="picture"
+                responsiveOrientationWhenOrientationLocked
+              />
+            )}
 
-        {/* Preset overlays — matched to FilteredImage Skia rendering */}
-        {selectedPreset.settings.tintOpacity > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center', backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} />
-        )}
-        {selectedPreset.settings.vignette > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} />
-        )}
-        {selectedPreset.settings.lightLeak > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} />
-        )}
-        {selectedPreset.settings.grain > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} />
-        )}
-        {selectedPreset.settings.rgbShift > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center', overflow: 'hidden' }]}>
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,0,0,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: selectedPreset.settings.rgbShift * 8 }] }]} />
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,255,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: -selectedPreset.settings.rgbShift * 8 }] }]} />
+            {/* Double Exposure Viewfinder Overlay */}
+            {doubleExposureFirstPhoto && (
+              <Animated.Image
+                source={{ uri: doubleExposureFirstPhoto }}
+                style={[StyleSheet.absoluteFillObject, { opacity: 0.4 }]}
+                resizeMode="cover"
+              />
+            )}
+
+            {/* Preset overlays — matched to FilteredImage Skia rendering */}
+            {selectedPreset.settings.tintOpacity > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} pointerEvents="none" />
+            )}
+            {selectedPreset.settings.vignette > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} pointerEvents="none" />
+            )}
+            {selectedPreset.settings.lightLeak > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} pointerEvents="none" />
+            )}
+            {selectedPreset.settings.grain > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} pointerEvents="none" />
+            )}
+            {selectedPreset.settings.rgbShift > 0 && (
+              <View style={[StyleSheet.absoluteFillObject]} pointerEvents="none">
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,0,0,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: selectedPreset.settings.rgbShift * 8 }] }]} />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,255,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: -selectedPreset.settings.rgbShift * 8 }] }]} />
+              </View>
+            )}
+            {selectedPreset.settings.halation > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} pointerEvents="none" />
+            )}
+            {selectedPreset.settings.flash > 0 && (
+              <View style={[StyleSheet.absoluteFillObject, styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} pointerEvents="none" />
+            )}
+
+            {/* Focus Brackets & Grid Lines */}
+            <View style={styles.viewfinderFocusOverlay} pointerEvents="none">
+              <View style={styles.gridLineH1} />
+              <View style={styles.gridLineH2} />
+              <View style={styles.gridLineV1} />
+              <View style={styles.gridLineV2} />
+              
+              <View style={styles.focusBrackets}>
+                <View style={[styles.focusBracket, styles.bracketTL]} />
+                <View style={[styles.focusBracket, styles.bracketTR]} />
+                <View style={[styles.focusBracket, styles.bracketBL]} />
+                <View style={[styles.focusBracket, styles.bracketBR]} />
+                <View style={styles.focusCenterDot} />
+              </View>
+            </View>
+
+            {selectedPreset.settings.timestamp && (
+              <Text style={styles.viewfinderTimestamp} pointerEvents="none">
+                {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+              </Text>
+            )}
+
+            {/* Double Exposure Indicator Banner */}
+            {doubleExposureFirstPhoto && (
+              <View style={styles.doubleExposureBanner}>
+                <Text style={styles.doubleExposureBannerText}>EXPOSURE 1/2 - TAKE SECOND SHOT</Text>
+                <TouchableOpacity style={styles.doubleExposureCancel} onPress={() => {
+                  setDoubleExposureFirstPhoto(null);
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}>
+                  <Text style={styles.doubleExposureCancelText}>CANCEL</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-        )}
-        {selectedPreset.settings.halation > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} />
-        )}
-        {selectedPreset.settings.flash > 0 && (
-          <View style={[styles.overlay, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }, styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} />
-        )}
-        {selectedPreset.settings.timestamp && (
-          <Text style={[styles.timestamp, { right: (SCREEN_WIDTH - cameraSize.width) / 2 + 18, bottom: (SCREEN_HEIGHT - cameraSize.height) / 2 + 20 }]}>
-            {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-          </Text>
-        )}
+        </View>
 
         {/* ── Top bar ── */}
         <View style={[styles.topBar, { paddingTop: isTablet ? 20 : 10, paddingHorizontal: isTablet ? 32 : 16 }]}>
@@ -282,6 +353,13 @@ export default function CameraScreen() {
             <View style={styles.controlsRow}>
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.controlBtn, isDoubleExposureMode && styles.controlBtnActive]} onPress={() => {
+                setIsDoubleExposureMode(!isDoubleExposureMode);
+                setDoubleExposureFirstPhoto(null);
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale, color: isDoubleExposureMode ? '#FFB800' : '#FFF' }]}>DBL EXP</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.controlBtn, isSnapMode && styles.controlBtnActive]} onPress={toggleSnapMode}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>SNAP</Text>
@@ -461,6 +539,93 @@ const styles = StyleSheet.create({
     color: 'rgba(255,180,50,0.9)',
     fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  skeuoLeatherTexture: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#1C1C1E',
+    opacity: 0.95,
+  },
+  viewfinderFrame: {
+    backgroundColor: '#0E0E0E',
+    padding: 12,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#3A3A3C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  viewfinderFocusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridLineH1: { position: 'absolute', top: '33.3%', left: 0, right: 0, height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)' },
+  gridLineH2: { position: 'absolute', top: '66.6%', left: 0, right: 0, height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)' },
+  gridLineV1: { position: 'absolute', left: '33.3%', top: 0, bottom: 0, width: 0.5, backgroundColor: 'rgba(255,255,255,0.12)' },
+  gridLineV2: { position: 'absolute', left: '66.6%', top: 0, bottom: 0, width: 0.5, backgroundColor: 'rgba(255,255,255,0.12)' },
+  focusBrackets: {
+    width: 64,
+    height: 64,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  focusBracket: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderColor: 'rgba(255,184,0,0.6)',
+  },
+  bracketTL: { top: 0, left: 0, borderTopWidth: 1.5, borderLeftWidth: 1.5 },
+  bracketTR: { top: 0, right: 0, borderTopWidth: 1.5, borderRightWidth: 1.5 },
+  bracketBL: { bottom: 0, left: 0, borderBottomWidth: 1.5, borderLeftWidth: 1.5 },
+  bracketBR: { bottom: 0, right: 0, borderBottomWidth: 1.5, borderRightWidth: 1.5 },
+  focusCenterDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,184,0,0.6)' },
+  viewfinderTimestamp: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    color: 'rgba(255,180,50,0.85)',
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  doubleExposureBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.35)',
+  },
+  doubleExposureBannerText: {
+    color: '#FFB800',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  doubleExposureCancel: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  doubleExposureCancelText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
 
   // Top bar

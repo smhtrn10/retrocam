@@ -43,6 +43,9 @@ export interface CameraSettings {
   flash: number;        // 0–1 (overexposed flash burn)
   halation: number;     // 0–1 (red glow around highlights)
   rgbShift: number;     // 0–1 (chromatic aberration)
+  flashColor?: string;  // hex color for flash gel (e.g. red, blue, green)
+  prism?: number;       // 0–1 strength for prism/reflection lens
+  retroDate?: string;   // custom retro date string e.g. "98 10 24"
 }
 
 export interface CameraPreset {

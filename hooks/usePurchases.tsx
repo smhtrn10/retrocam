@@ -36,6 +36,7 @@ interface PurchasesContextType {
   packages: PurchasesPackage[];
   isLoading: boolean;
   activePresetId: string | null;
+  setIsProOverride: (status: boolean | null) => Promise<void>;
 }
 
 const PurchasesContext = createContext<PurchasesContextType | undefined>(undefined);
@@ -48,7 +49,14 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const checkEntitlements = useCallback((customerInfo: CustomerInfo) => {
+  const checkEntitlements = useCallback(async (customerInfo: CustomerInfo) => {
+    const override = await AsyncStorage.getItem('is_pro_override');
+    if (override !== null) {
+      const isOverridden = override === 'true';
+      setIsPro(isOverridden);
+      setSubscriptionPlan(isOverridden ? 'annual' : null);
+      return;
+    }
     const active = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
     setIsPro(active);
     AsyncStorage.setItem(PREMIUM_CACHE_KEY, active ? 'true' : 'false').catch(() => { });
@@ -79,8 +87,18 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         const onboardingStatus = await AsyncStorage.getItem(ONBOARDING_KEY);
         setIsOnboardingComplete(onboardingStatus === 'true');
 
-        const cachedPro = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
-        if (cachedPro === 'true') setIsPro(true);
+        const override = await AsyncStorage.getItem('is_pro_override');
+        if (override !== null) {
+          const isOverridden = override === 'true';
+          setIsPro(isOverridden);
+          setSubscriptionPlan(isOverridden ? 'annual' : null);
+        } else {
+          const cachedPro = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
+          if (cachedPro === 'true') {
+            setIsPro(true);
+            setSubscriptionPlan('annual');
+          }
+        }
       } catch (e) {
         setIsOnboardingComplete(false);
       }
@@ -196,6 +214,23 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
     }
   }, [checkEntitlements, hidePaywall]);
 
+  const setIsProOverride = useCallback(async (status: boolean | null) => {
+    if (status === null) {
+      await AsyncStorage.removeItem('is_pro_override');
+      const cached = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
+      setIsPro(cached === 'true');
+      if (cached === 'true') {
+        setSubscriptionPlan('annual');
+      } else {
+        setSubscriptionPlan(null);
+      }
+    } else {
+      await AsyncStorage.setItem('is_pro_override', status ? 'true' : 'false');
+      setIsPro(status);
+      setSubscriptionPlan(status ? 'annual' : null);
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       isPro,
@@ -212,8 +247,9 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
       // isLoading: null iken de loading sayılır
       isLoading: isLoading || isOnboardingComplete === null,
       activePresetId,
+      setIsProOverride,
     }),
-    [isPro, subscriptionPlan, isOnboardingComplete, showPaywall, hidePaywall, purchasePackage, simulateDevPurchase, restorePurchases, packages, isLoading, activePresetId]
+    [isPro, subscriptionPlan, isOnboardingComplete, showPaywall, hidePaywall, purchasePackage, simulateDevPurchase, restorePurchases, packages, isLoading, activePresetId, setIsProOverride]
   );
 
   return (

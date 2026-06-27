@@ -7,17 +7,22 @@ import {
   TouchableOpacity,
   ScrollView,
   Linking,
+  Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { X, Crown, RefreshCcw, Mail, Shield } from 'lucide-react-native';
+import * as StoreReview from 'expo-store-review';
+import { X, Crown, RefreshCcw, Mail, Shield, Star } from 'lucide-react-native';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
 
+const SHOW_DEV_TOOLS = true;
+
 export default function SettingsScreen() {
   const { t } = useTranslation();
-  const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete, simulateDevPurchase } = usePurchases();
+  const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete, simulateDevPurchase, setIsProOverride } = usePurchases();
   const { isTablet, scale: uiScale } = useDevice();
 
   const handleRestore = useCallback(async () => {
@@ -39,6 +44,16 @@ export default function SettingsScreen() {
     await setOnboardingComplete(false);
     router.replace('/onboarding');
   }, [setOnboardingComplete]);
+
+  const handleRateApp = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === 'ios') {
+      const isAvailable = await StoreReview.isAvailableAsync();
+      if (isAvailable) {
+        await StoreReview.requestReview();
+      }
+    }
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -103,6 +118,13 @@ export default function SettingsScreen() {
         <View style={[styles.section, { paddingHorizontal: isTablet ? 0 : 16 }]}>
           <Text style={[styles.sectionTitle, { fontSize: 12 * uiScale }]}>{t('settings.about')}</Text>
 
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity style={styles.row} onPress={handleRateApp}>
+              <Star size={20 * uiScale} color="#888888" />
+              <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>{t('settings.rate_app', 'Rate App')}</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={styles.row} onPress={() => Linking.openURL('https://semihtrn4.github.io/retrocam_privacy/')}>
             <Mail size={20 * uiScale} color="#888888" />
             <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>{t('settings.contact')}</Text>
@@ -120,16 +142,31 @@ export default function SettingsScreen() {
         </View>
 
         {/* DEV Tools */}
-        {__DEV__ && (
+        {SHOW_DEV_TOOLS && (
           <View style={[styles.section, { paddingHorizontal: isTablet ? 0 : 16 }]}>
             <Text style={[styles.sectionTitle, { fontSize: 12 * uiScale }]}>DEV Tools</Text>
-            <TouchableOpacity style={styles.row} onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              void simulateDevPurchase();
+            
+            <TouchableOpacity style={styles.row} onPress={async () => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const newProStatus = !isPro;
+              await setIsProOverride(newProStatus);
+              Alert.alert('Success', `PRO status changed to ${newProStatus ? 'ACTIVE' : 'INACTIVE'}`);
             }}>
-              <Crown size={20 * uiScale} color="rgba(255,100,100,0.8)" />
-              <Text style={[styles.devText, { fontSize: 14 * uiScale }]}>Simulate Pro Purchase</Text>
+              <Crown size={20 * uiScale} color={isPro ? "#FFB800" : "rgba(255,100,100,0.8)"} />
+              <Text style={[styles.devText, { fontSize: 14 * uiScale, color: isPro ? "#FFB800" : "rgba(255,100,100,0.8)" }]}>
+                {isPro ? 'Dev: Disable PRO Mode' : 'Dev: Enable PRO Mode'}
+              </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.row} onPress={async () => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await setIsProOverride(null);
+              Alert.alert('Success', 'Cleared Pro override. Back to RevenueCat status.');
+            }}>
+              <RefreshCcw size={20 * uiScale} color="rgba(255,100,100,0.8)" />
+              <Text style={[styles.devText, { fontSize: 14 * uiScale }]}>Reset Pro Override</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.row} onPress={handleRestartOnboarding}>
               <RefreshCcw size={20 * uiScale} color="rgba(255,100,100,0.8)" />
               <Text style={[styles.devText, { fontSize: 14 * uiScale }]}>Restart Onboarding</Text>

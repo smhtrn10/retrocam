@@ -128,7 +128,12 @@
     "120": "120 Format",
     "8mm": "8mm Sinema",
     "digital-y2k": "Y2K Dijital",
-    "half-frame": "Half Frame",
-    "b-w": "Siyah Beyaz"
+    "half-frame": "Yarım Kare",
+    "b-w": "Siyah Beyaz",
+    "35mm": "35mm Film",
+    "instant": "Şipşak",
+    "16mm": "16mm Sinema",
+    "camcorder": "El Kamerası",
+    "special": "Özel"
   }
 }

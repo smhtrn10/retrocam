@@ -31,6 +31,7 @@ export interface FilteredImageRef {
 
 interface FilteredImageProps {
   uri: string;
+  secondaryUri?: string;
   preset: CameraPreset;
   width: number;
   height: number;
@@ -43,11 +44,20 @@ function seededRandom(seed: number) {
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
 
+function getSeedFromUri(uri: string): number {
+  let hash = 0;
+  for (let i = 0; i < uri.length; i++) {
+    hash = uri.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash);
+}
+
 export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(function FilteredImage(
-  { uri, preset, width, height, showWatermark = false, overrides = {} },
+  { uri, secondaryUri, preset, width, height, showWatermark = false, overrides = {} },
   ref
 ) {
   const image = useImage(uri);
+  const secondaryImage = useImage(secondaryUri || undefined);
   const canvasRef = useCanvasRef();
   const settings = { ...preset.settings, ...overrides };
   const { frameType } = preset;
@@ -76,9 +86,39 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   ]);
 
   const timestampStr = useMemo(() => {
-    const d = new Date();
-    return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-  }, []);
+    if (settings.retroDate) return settings.retroDate;
+    const seed = getSeedFromUri(uri);
+    const rand = seededRandom(seed);
+    const year = 1990 + Math.floor(rand() * 10);
+    const month = 1 + Math.floor(rand() * 12);
+    const day = 1 + Math.floor(rand() * 28);
+    const yy = String(year).slice(-2);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${mm}/${dd}/'${yy}`;
+  }, [settings.retroDate, uri]);
+
+  const leakParams = useMemo(() => {
+    if (settings.lightLeak <= 0) return null;
+    const seed = getSeedFromUri(uri);
+    const rand = seededRandom(seed);
+    const leakType = Math.floor(rand() * 4);
+    
+    let startFX = 0, startFY = 0, endFX = 0.7, endFY = 0.55;
+    let colors = [`rgba(255,100,50,${settings.lightLeak * 0.6})`, 'transparent'];
+    
+    if (leakType === 1) { // top right purple/pink
+      startFX = 1; startFY = 0; endFX = 0.3; endFY = 0.6;
+      colors = [`rgba(255,50,150,${settings.lightLeak * 0.6})`, 'transparent'];
+    } else if (leakType === 2) { // bottom left orange/yellow
+      startFX = 0; startFY = 1; endFX = 0.6; endFY = 0.4;
+      colors = [`rgba(255,180,30,${settings.lightLeak * 0.6})`, 'transparent'];
+    } else if (leakType === 3) { // bottom right red
+      startFX = 1; startFY = 1; endFX = 0.4; endFY = 0.5;
+      colors = [`rgba(230,30,30,${settings.lightLeak * 0.6})`, 'transparent'];
+    }
+    return { startFX, startFY, endFX, endFY, colors };
+  }, [settings.lightLeak, uri]);
 
   const dustParticles = useMemo(() => {
     if (settings.dust <= 0) return [];
@@ -113,6 +153,31 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
         <ColorMatrix matrix={colorMatrix} />
         {settings.blur > 0 && <Blur blur={settings.blur * 8} />}
       </SkiaImage>
+
+      {secondaryImage && (
+        <Group blendMode="screen" opacity={0.5}>
+          <SkiaImage image={secondaryImage} x={x} y={y} width={w} height={h} fit="cover">
+            <ColorMatrix matrix={colorMatrix} />
+            {settings.blur > 0 && <Blur blur={settings.blur * 8} />}
+          </SkiaImage>
+        </Group>
+      )}
+
+      {settings.prism !== undefined && settings.prism > 0 && (
+        <>
+          <Group blendMode="screen" opacity={settings.prism * 0.3}>
+            <SkiaImage image={image} x={x - w * 0.06} y={y - h * 0.06} width={w} height={h} fit="cover">
+              <ColorMatrix matrix={colorMatrix} />
+            </SkiaImage>
+          </Group>
+          <Group blendMode="screen" opacity={settings.prism * 0.3}>
+            <SkiaImage image={image} x={x + w * 0.06} y={y + h * 0.06} width={w} height={h} fit="cover">
+              <ColorMatrix matrix={colorMatrix} />
+            </SkiaImage>
+          </Group>
+        </>
+      )}
+
       {settings.rgbShift > 0 && (
         <>
           <SkiaImage image={image} x={x + shift} y={y} width={w} height={h} fit="cover" opacity={0.35}>
@@ -141,12 +206,12 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
           />
         </Rect>
       )}
-      {settings.lightLeak > 0 && (
-        <Rect x={x} y={y} width={w * 0.7} height={h * 0.55}>
+      {leakParams && (
+        <Rect x={x} y={y} width={w} height={h}>
           <SkiaLinearGradient
-            start={vec(x, y)}
-            end={vec(x + w * 0.7, y + h * 0.55)}
-            colors={[`rgba(255,180,50,${settings.lightLeak * 0.5})`, 'transparent']}
+            start={vec(x + w * leakParams.startFX, y + h * leakParams.startFY)}
+            end={vec(x + w * leakParams.endFX, y + h * leakParams.endFY)}
+            colors={leakParams.colors}
           />
         </Rect>
       )}
@@ -160,11 +225,11 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
         </Rect>
       )}
       {settings.flash > 0 && (
-        <Rect x={x + w * 0.1} y={y + h * 0.05} width={w * 0.8} height={h * 0.7}>
+        <Rect x={x + w * 0.1} y={y + h * 0.05} width={w * 0.8} height={h * 0.7} opacity={settings.flash * 0.65}>
           <RadialGradient
             c={vec(x + w / 2, y + h * 0.35)}
             r={Math.max(w, h) * 0.5}
-            colors={[`rgba(255,255,240,${settings.flash * 0.65})`, 'transparent']}
+            colors={[settings.flashColor || '#FFFFF0', 'transparent']}
           />
         </Rect>
       )}

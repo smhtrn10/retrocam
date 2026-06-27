@@ -122,13 +122,18 @@
     }
   },
   "camera_types": {
-    "disposable": "Disposable",
+    "disposable": "Einwegkamera",
     "modern": "Modern",
     "vhs": "VHS",
     "120": "120 Format",
-    "8mm": "8mm Cinema",
+    "8mm": "8mm Schmalfilm",
     "digital-y2k": "Y2K Digital",
-    "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "half-frame": "Halbformat",
+    "b-w": "Schwarz-Weiß",
+    "35mm": "35mm Film",
+    "instant": "Sofortbild",
+    "16mm": "16mm Schmalfilm",
+    "camcorder": "Camcorder",
+    "special": "Spezial"
   }
 }

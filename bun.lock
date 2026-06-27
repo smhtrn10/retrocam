@@ -2018,7 +2018,7 @@
 
     "react-native-web/memoize-one": ["memoize-one@6.0.0", "", {}, ""],
 
-    "react-native-worklets/semver": ["semver@7.7.2", "", { "bin": "bin/semver.js" }, "sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA=="],
+    "react-native-worklets/semver": ["semver@7.7.2", "", { "bin": "bin/semver.js" }, ""],
 
     "react-reconciler/scheduler": ["scheduler@0.25.0", "", {}, ""],
 
@@ -2029,8 +2029,6 @@
     "send/debug": ["debug@2.6.9", "", { "dependencies": { "ms": "2.0.0" } }, ""],
 
     "serve-static/encodeurl": ["encodeurl@2.0.0", "", {}, ""],
-
-    "simple-plist/bplist-parser": ["bplist-parser@0.3.1", "", { "dependencies": { "big-integer": "1.6.x" } }, ""],
 
     "source-map-support/source-map": ["source-map@0.6.1", "", {}, ""],
 

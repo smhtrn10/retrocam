@@ -21,6 +21,30 @@ import { CAMERA_PRESETS } from '@/constants/presets';
 import { usePurchases } from '@/hooks/usePurchases';
 import { buildFFmpegArgs } from '@/utils/videoFilter';
 import { useDevice } from '@/hooks/useDevice';
+import {
+  Canvas,
+  Rect,
+  RoundedRect,
+  Circle,
+  RadialGradient,
+  LinearGradient as SkiaLinearGradient,
+  Turbulence,
+  useCanvasRef,
+  ImageFormat,
+} from '@shopify/react-native-skia';
+
+function getSeedFromUri(uri: string): number {
+  let hash = 0;
+  for (let i = 0; i < uri.length; i++) {
+    hash = uri.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash);
+}
+
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
 
 // FFmpeg setup
 let FFmpegKit: any = null;
@@ -57,6 +81,7 @@ export default function VideoPreviewScreen() {
   const isMounted = useRef(true);
   const tempFilesRef = useRef<string[]>([]);
   const filteredUriRef = useRef<string>(uri);
+  const canvasRef = useCanvasRef();
 
   useEffect(() => {
     isMounted.current = true;
@@ -67,6 +92,70 @@ export default function VideoPreviewScreen() {
     () => CAMERA_PRESETS.find((p) => p.id === presetId) || CAMERA_PRESETS[0],
     [presetId]
   );
+
+  const canvasWidth = 1080;
+  const canvasHeight = 1920;
+
+  const dustParticles = useMemo(() => {
+    if (preset.settings.dust <= 0) return [];
+    const seed = getSeedFromUri(uri);
+    const rand = seededRandom(seed);
+    return Array.from({ length: Math.floor(preset.settings.dust * 20) }, () => ({
+      x: rand() * canvasWidth,
+      y: rand() * canvasHeight,
+      size: rand() * 6 + 2,
+      opacity: rand() * 0.4 + 0.15,
+    }));
+  }, [preset.settings.dust, uri]);
+
+  const scratches = useMemo(() => {
+    if (preset.settings.dust <= 0.2) return [];
+    const seed = getSeedFromUri(uri);
+    const rand = seededRandom(seed + 1);
+    return Array.from({ length: Math.floor(preset.settings.dust * 4) }, () => ({
+      x: rand() * canvasWidth,
+      top: rand() * canvasHeight * 0.4,
+      h: rand() * canvasHeight * 0.3 + canvasHeight * 0.1,
+      opacity: rand() * 0.2 + 0.06,
+    }));
+  }, [preset.settings.dust, uri]);
+
+  const leakParams = useMemo(() => {
+    if (preset.settings.lightLeak <= 0) return null;
+    const seed = getSeedFromUri(uri);
+    const rand = seededRandom(seed);
+    const leakType = Math.floor(rand() * 4);
+    
+    let startFX = 0, startFY = 0, endFX = 0.7, endFY = 0.55;
+    let colors = [`rgba(255,100,50,${preset.settings.lightLeak * 0.6})`, 'transparent'];
+    
+    if (leakType === 1) {
+      startFX = 1; startFY = 0; endFX = 0.3; endFY = 0.6;
+      colors = [`rgba(255,50,150,${preset.settings.lightLeak * 0.6})`, 'transparent'];
+    } else if (leakType === 2) {
+      startFX = 0; startFY = 1; endFX = 0.6; endFY = 0.4;
+      colors = [`rgba(255,180,30,${preset.settings.lightLeak * 0.6})`, 'transparent'];
+    } else if (leakType === 3) {
+      startFX = 1; startFY = 1; endFX = 0.4; endFY = 0.5;
+      colors = [`rgba(230,30,30,${preset.settings.lightLeak * 0.6})`, 'transparent'];
+    }
+    return { startFX, startFY, endFX, endFY, colors };
+  }, [preset.settings.lightLeak, uri]);
+
+  const sprocketHoles = (side: 'left' | 'right', sw: number) => {
+    const sx = side === 'left' ? 0 : canvasWidth - sw;
+    return Array.from({ length: 10 }).map((_, i) => (
+      <RoundedRect
+        key={`sp_${side}_${i}`}
+        x={sx + 8}
+        y={i * (canvasHeight / 10) + 8}
+        width={sw - 16}
+        height={canvasHeight / 10 - 16}
+        r={6}
+        color="#080808"
+      />
+    ));
+  };
 
   // Apply filter automatically on mount
   useEffect(() => {
@@ -83,7 +172,22 @@ export default function VideoPreviewScreen() {
       const rawOutputPath = getSafePath(outputUri);
 
       try {
-        const args = buildFFmpegArgs(rawInputPath, rawOutputPath, preset.settings);
+        let overlayPath = undefined;
+        if (canvasRef.current) {
+          const snapshot = await canvasRef.current.makeImageSnapshotAsync();
+          if (snapshot) {
+            const base64 = snapshot.encodeToBase64(ImageFormat.PNG, 100);
+            const overlayFileName = `retrocam_ov_${Date.now()}.png`;
+            const overlayUri = (FileSystem.documentDirectory ?? '') + overlayFileName;
+            await FileSystem.writeAsStringAsync(overlayUri, base64, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            overlayPath = getSafePath(overlayUri);
+            tempFilesRef.current.push(overlayUri);
+          }
+        }
+
+        const args = buildFFmpegArgs(rawInputPath, rawOutputPath, preset.settings, overlayPath);
         const session = await FFmpegKit.executeWithArguments(args);
         const returnCode = await session.getReturnCode();
 
@@ -267,6 +371,150 @@ export default function VideoPreviewScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Hidden Skia Canvas for video overlay generation */}
+      <View style={{ position: 'absolute', top: -9999, left: -9999, width: canvasWidth, height: canvasHeight, opacity: 0 }}>
+        <Canvas ref={canvasRef} style={{ width: canvasWidth, height: canvasHeight }}>
+          {/* Vignette */}
+          {preset.settings.vignette > 0 && (
+            <Rect x={0} y={0} width={canvasWidth} height={canvasHeight}>
+              <RadialGradient
+                c={{ x: canvasWidth / 2, y: canvasHeight / 2 }}
+                r={canvasHeight * 0.72}
+                colors={['transparent', `rgba(0,0,0,${preset.settings.vignette * 0.9})`]}
+              />
+            </Rect>
+          )}
+
+          {/* Light leaks */}
+          {leakParams && (
+            <Rect x={0} y={0} width={canvasWidth} height={canvasHeight}>
+              <SkiaLinearGradient
+                start={{ x: canvasWidth * leakParams.startFX, y: canvasHeight * leakParams.startFY }}
+                end={{ x: canvasWidth * leakParams.endFX, y: canvasHeight * leakParams.endFY }}
+                colors={leakParams.colors}
+              />
+            </Rect>
+          )}
+
+          {/* Halation */}
+          {preset.settings.halation > 0 && (
+            <Rect x={canvasWidth * 0.1} y={0} width={canvasWidth * 0.8} height={canvasHeight * 0.6}>
+              <SkiaLinearGradient
+                start={{ x: canvasWidth * 0.5, y: 0 }}
+                end={{ x: canvasWidth * 0.5, y: canvasHeight * 0.6 }}
+                colors={[`rgba(255,60,0,${preset.settings.halation * 0.45})`, 'transparent']}
+              />
+            </Rect>
+          )}
+
+          {/* Flash */}
+          {preset.settings.flash > 0 && (
+            <Rect x={canvasWidth * 0.1} y={canvasHeight * 0.05} width={canvasWidth * 0.8} height={canvasHeight * 0.7} opacity={preset.settings.flash * 0.65}>
+              <RadialGradient
+                c={{ x: canvasWidth / 2, y: canvasHeight * 0.35 }}
+                r={canvasHeight * 0.5}
+                colors={[preset.settings.flashColor || '#FFFFF0', 'transparent']}
+              />
+            </Rect>
+          )}
+
+          {/* Grain */}
+          {preset.settings.grain > 0 && (
+            <Rect x={0} y={0} width={canvasWidth} height={canvasHeight} opacity={preset.settings.grain * 0.55}>
+              <Turbulence freqX={0.65} freqY={0.65} octaves={3} />
+            </Rect>
+          )}
+
+          {/* Dust particles */}
+          {dustParticles.map((p, i) => (
+            <Circle key={`d${i}`} cx={p.x} cy={p.y} r={p.size / 2} color={`rgba(200,190,170,${p.opacity})`} />
+          ))}
+
+          {/* Scratches */}
+          {scratches.map((sc, i) => (
+            <Rect key={`sc${i}`} x={sc.x} y={sc.top} width={2} height={sc.h} color={`rgba(255,255,255,${sc.opacity})`} />
+          ))}
+
+          {/* Polaroid frame */}
+          {preset.frameType === 'polaroid' && (
+            <Group>
+              <Rect x={0} y={0} width={canvasWidth} height={54} color="#FFF" />
+              <Rect x={0} y={1726} width={canvasWidth} height={194} color="#FFF" />
+              <Rect x={0} y={54} width={54} height={1672} color="#FFF" />
+              <Rect x={1026} y={54} width={54} height={1672} color="#FFF" />
+            </Group>
+          )}
+
+          {/* Half-Frame */}
+          {preset.frameType === 'half-frame' && (
+            <Group>
+              <Rect x={534} y={0} width={12} height={canvasHeight} color="#111" />
+              <Rect x={0} y={0} width={15} height={canvasHeight} color="#111" />
+              <Rect x={1065} y={0} width={15} height={canvasHeight} color="#111" />
+              {Array.from({ length: 8 }).map((_, i) => (
+                <RoundedRect key={`hl${i}`} x={2} y={i * (canvasHeight / 8) + 4} width={11} height={canvasHeight / 8 - 8} r={3} color="#1A1A1A" />
+              ))}
+              {Array.from({ length: 8 }).map((_, i) => (
+                <RoundedRect key={`hr${i}`} x={1067} y={i * (canvasHeight / 8) + 4} width={11} height={canvasHeight / 8 - 8} r={3} color="#1A1A1A" />
+              ))}
+            </Group>
+          )}
+
+          {/* 8mm / 16mm */}
+          {(preset.frameType === '8mm' || preset.frameType === '16mm') && (
+            <Group>
+              <Rect x={0} y={0} width={preset.frameType === '16mm' ? 120 : 90} height={canvasHeight} color="#0A0A0A" />
+              <Rect x={canvasWidth - (preset.frameType === '16mm' ? 120 : 90)} y={0} width={preset.frameType === '16mm' ? 120 : 90} height={canvasHeight} color="#0A0A0A" />
+              {sprocketHoles('left', preset.frameType === '16mm' ? 120 : 90)}
+              {sprocketHoles('right', preset.frameType === '16mm' ? 120 : 90)}
+            </Group>
+          )}
+
+          {/* Fisheye */}
+          {preset.frameType === 'fisheye' && (
+            <Group>
+              <Rect x={0} y={0} width={canvasWidth} height={canvasHeight} color="#000" />
+              <Circle cx={540} cy={960} r={496} color="#000" blendMode="clear" />
+            </Group>
+          )}
+
+          {/* Camcorder scanlines */}
+          {preset.frameType === 'camcorder' && (
+            <Group>
+              {Array.from({ length: Math.floor(canvasHeight / 15) }).map((_, i) => (
+                <Rect key={i} x={0} y={i * 15} width={canvasWidth} height={3} color="rgba(0,0,0,0.06)" />
+              ))}
+            </Group>
+          )}
+
+          {/* VHS scanlines */}
+          {preset.frameType === 'vhs' && (
+            <Group>
+              {Array.from({ length: Math.floor(canvasHeight / 12) }).map((_, i) => (
+                <Rect key={i} x={0} y={i * 12} width={canvasWidth} height={3} color="rgba(0,0,0,0.08)" />
+              ))}
+              <Rect x={0} y={canvasHeight * 0.72} width={canvasWidth} height={9} color="rgba(255,255,255,0.04)" />
+            </Group>
+          )}
+
+          {/* Digital */}
+          {preset.frameType === 'digital' && (
+            <Group>
+              <Rect x={0} y={0} width={canvasWidth} height={90} color="rgba(0,0,0,0.55)" />
+              <Rect x={0} y={canvasHeight - 90} width={canvasWidth} height={90} color="rgba(0,0,0,0.55)" />
+            </Group>
+          )}
+
+          {/* Disposable */}
+          {preset.frameType === 'disposable' && (
+            <Group>
+              <Rect x={0} y={0} width={canvasWidth} height={canvasHeight} color="#000" />
+              <RoundedRect x={12} y={12} width={canvasWidth - 24} height={canvasHeight - 24} r={48} color="#000" blendMode="clear" />
+            </Group>
+          )}
+        </Canvas>
+      </View>
     </SafeAreaView>
   );
 }

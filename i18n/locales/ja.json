@@ -122,13 +122,18 @@
     }
   },
   "camera_types": {
-    "disposable": "Disposable",
-    "modern": "Modern",
+    "disposable": "使い捨て",
+    "modern": "モダン",
     "vhs": "VHS",
-    "120": "120 Format",
-    "8mm": "8mm Cinema",
-    "digital-y2k": "Y2K Digital",
-    "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "120": "120フォーマット",
+    "8mm": "8mmシネマ",
+    "digital-y2k": "Y2Kデジタル",
+    "half-frame": "ハーフフレーム",
+    "b-w": "白黒",
+    "35mm": "35mmフィルム",
+    "instant": "インスタント",
+    "16mm": "16mmシネマ",
+    "camcorder": "ビデオカメラ",
+    "special": "スペシャル"
   }
 }

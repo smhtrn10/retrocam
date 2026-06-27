@@ -2,7 +2,7 @@
   "expo": {
     "name": "RetroCam",
     "slug": "retrocam",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "retrocam",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.retrocam.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "RetroCam uses your camera to capture photos and videos and apply vintage film filters in real time. All captured content is processed locally and is never uploaded to any server.",

@@ -23,7 +23,7 @@ import { isPresetLocked } from '@/utils/presets';
 import { FilteredImage, FilteredImageRef } from '@/components/FilteredImage';
 import { useDevice } from '@/hooks/useDevice';
 
-type EditKey = 'grain' | 'vignette' | 'dust' | 'blur' | 'temperature';
+type EditKey = 'grain' | 'vignette' | 'dust' | 'blur' | 'temperature' | 'prism' | 'flash';
 
 const EDIT_PARAMS: { key: EditKey; label: string; min: number; max: number }[] = [
   { key: 'grain',       label: 'GRAIN',      min: 0,  max: 1 },
@@ -31,6 +31,8 @@ const EDIT_PARAMS: { key: EditKey; label: string; min: number; max: number }[] =
   { key: 'dust',        label: 'DUST',       min: 0,  max: 1 },
   { key: 'blur',        label: 'SOFT FOCUS', min: 0,  max: 1 },
   { key: 'temperature', label: 'WARMTH',     min: -1, max: 1 },
+  { key: 'prism',       label: 'PRISM LENS', min: 0,  max: 1 },
+  { key: 'flash',       label: 'FLASH GEL',  min: 0,  max: 1 },
 ];
 
 function Slider({
@@ -72,7 +74,7 @@ function Slider({
 }
 
 export default function PreviewScreen() {
-  const { uri, presetId } = useLocalSearchParams<{ uri: string; presetId: string }>();
+  const { uri, secondaryUri, presetId } = useLocalSearchParams<{ uri: string; secondaryUri?: string; presetId: string }>();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, isTablet, scale: uiScale } = useDevice();
   const [showOriginal, setShowOriginal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -156,7 +158,7 @@ export default function PreviewScreen() {
 
   const getValue = (key: EditKey) => {
     if (overrides[key] !== undefined) return overrides[key] as number;
-    return preset.settings[key] as number;
+    return (preset.settings[key] ?? 0) as number;
   };
 
   return (
@@ -192,6 +194,7 @@ export default function PreviewScreen() {
           <FilteredImage
             ref={filteredImageRef}
             uri={uri}
+            secondaryUri={secondaryUri}
             preset={preset}
             width={isTablet ? Math.min(SCREEN_WIDTH - 64, 800) : SCREEN_WIDTH}
             height={IMAGE_HEIGHT}

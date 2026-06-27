@@ -122,13 +122,18 @@
     }
   },
   "camera_types": {
-    "disposable": "Disposable",
-    "modern": "Modern",
+    "disposable": "Одноразовая",
+    "modern": "Современная",
     "vhs": "VHS",
-    "120": "120 Format",
-    "8mm": "8mm Cinema",
-    "digital-y2k": "Y2K Digital",
-    "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "120": "Формат 120",
+    "8mm": "Кино 8мм",
+    "digital-y2k": "Цифровой Y2K",
+    "half-frame": "Полукадровый",
+    "b-w": "Чёрно-белый",
+    "35mm": "Плёнка 35мм",
+    "instant": "Моментальная",
+    "16mm": "Кино 16мм",
+    "camcorder": "Видеокамера",
+    "special": "Специальный"
   }
 }

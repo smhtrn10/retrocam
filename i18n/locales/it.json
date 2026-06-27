@@ -122,13 +122,18 @@
     }
   },
   "camera_types": {
-    "disposable": "Disposable",
-    "modern": "Modern",
+    "disposable": "Usa e Getta",
+    "modern": "Moderno",
     "vhs": "VHS",
-    "120": "120 Format",
-    "8mm": "8mm Cinema",
-    "digital-y2k": "Y2K Digital",
-    "half-frame": "Half Frame",
-    "b-w": "Black & White"
+    "120": "Formato 120",
+    "8mm": "Cinema 8mm",
+    "digital-y2k": "Digitale Y2K",
+    "half-frame": "Mezzo Formato",
+    "b-w": "Bianco e Nero",
+    "35mm": "Pellicola 35mm",
+    "instant": "Istantanea",
+    "16mm": "Cinema 16mm",
+    "camcorder": "Videocamera",
+    "special": "Speciale"
   }
 }

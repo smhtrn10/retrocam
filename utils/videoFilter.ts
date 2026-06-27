@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { CameraSettings } from '@/constants/presets';
 
 /**
@@ -88,7 +89,8 @@ export function buildVideoFilter(settings: CameraSettings): string {
 export function buildFFmpegArgs(
   inputUri: string,
   outputUri: string,
-  settings: CameraSettings
+  settings: CameraSettings,
+  overlayPath?: string
 ): string[] {
   const filter = buildVideoFilter(settings);
 
@@ -96,9 +98,59 @@ export function buildFFmpegArgs(
     '-i', inputUri,
   ];
 
-  // Only add -vf if there are actual filters
-  if (filter) {
-    baseArgs.push('-vf', filter);
+  if (overlayPath) {
+    baseArgs.push('-i', overlayPath);
+  }
+
+  // Determine font file path for drawtext
+  const fontFile = Platform.select({
+    ios: '/System/Library/Fonts/Courier.ttc',
+    android: '/system/fonts/DroidSansMono.ttf',
+    default: 'monospace',
+  });
+
+  // Generate date string consistent with FilteredImage seed
+  let dateStr = '';
+  if (settings.timestamp) {
+    const rawInput = inputUri.split('/').pop() || 'video';
+    let hash = 0;
+    for (let i = 0; i < rawInput.length; i++) {
+      hash = rawInput.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const seed = Math.abs(hash);
+    // Seeded random
+    let s = seed;
+    const rand = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    const year = 1990 + Math.floor(rand() * 10);
+    const month = 1 + Math.floor(rand() * 12);
+    const day = 1 + Math.floor(rand() * 28);
+    const yy = String(year).slice(-2);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    dateStr = settings.retroDate || `${mm}/${dd}/'${yy}`;
+  }
+
+  // Build filter graph
+  let filterGraph = '';
+  if (overlayPath) {
+    if (filter) {
+      filterGraph = `[1:v]scale=iw:ih[ov];[0:v]${filter}[filtered];[filtered][ov]overlay=0:0`;
+    } else {
+      filterGraph = `[1:v]scale=iw:ih[ov];[0:v][ov]overlay=0:0`;
+    }
+    if (settings.timestamp && dateStr) {
+      filterGraph += `,drawtext=fontfile='${fontFile}':text='${dateStr}':x=w-tw-40:y=h-th-40:fontcolor=0xFFB800:fontsize=36:box=1:boxcolor=0x00000044:boxborderw=4`;
+    }
+    baseArgs.push('-filter_complex', filterGraph);
+  } else {
+    let vfFilters = filter;
+    if (settings.timestamp && dateStr) {
+      const textFilter = `drawtext=fontfile='${fontFile}':text='${dateStr}':x=w-tw-40:y=h-th-40:fontcolor=0xFFB800:fontsize=36:box=1:boxcolor=0x00000044:boxborderw=4`;
+      vfFilters = vfFilters ? `${vfFilters},${textFilter}` : textFilter;
+    }
+    if (vfFilters) {
+      baseArgs.push('-vf', vfFilters);
+    }
   }
 
   return [
