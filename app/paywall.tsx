@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Linking, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  View, Text, TouchableOpacity, Image,
+  StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert, Linking
+} from 'react-native';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Haptics from 'expo-haptics';
-import { X, Crown, CheckCircle2 } from 'lucide-react-native';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +20,34 @@ export default function PaywallScreen() {
   const [showCloseButton, setShowCloseButton] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [scanCount, setScanCount] = useState(847);
+  
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.5)).current;
+
+  // Video Player Setup
+  const videoSource = require('../assets/images/animasyon.mp4');
+  const player = useVideoPlayer(videoSource, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  // App Config - Retrocam
+  const APP_CONFIG = useMemo(() => ({
+    headline: t('paywall.title', 'Unlock Your Vintage Aesthetic'),
+    subtitle: t('paywall.subtitle', 'Access all 40+ cameras and pro tools'),
+    counterVerb: t('paywall.counter_verb', 'editing'),
+    accentColor: '#FFD166',
+    gradientColors: ['#050510', '#0a0a0a', '#1A1410'] as const,
+    benefits: [
+      { icon: "📷", text: t('paywall.benefit_1', 'Access all 40+ cameras') },
+      { icon: "∞", text: t('paywall.benefit_2', 'Infinite resolution export') },
+      { icon: "✨", text: t('paywall.benefit_3', 'No ads, no watermarks') },
+      { icon: "🚀", text: t('paywall.benefit_4', 'Priority AI processing') },
+      { icon: "🌅", text: t('paywall.benefit_5', 'Exclusive golden hour features') },
+    ],
+  }), [t]);
 
   useEffect(() => {
     if (isPro) router.replace('/');
@@ -35,6 +66,33 @@ export default function PaywallScreen() {
       setSelectedPackage(annual?.identifier || monthly?.identifier || weekly?.identifier || packages[0].identifier);
     }
   }, [packages, selectedPackage]);
+
+  // Social proof counter drift
+  useEffect(() => {
+    const tick = () => {
+      setScanCount((n) => Math.max(820, Math.min(980, n + (Math.random() > 0.5 ? 1 : -1))));
+      setTimeout(tick, Math.random() * 5000 + 3000);
+    };
+    const tId = setTimeout(tick, 3000);
+    return () => clearTimeout(tId);
+  }, []);
+
+  // Badge pulse
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1,   duration: 1600, useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0.4, duration: 1600, useNativeDriver: false }),
+      ])
+    ).start();
+  }, [pulseAnim, glowAnim]);
 
   const handlePurchase = useCallback(async () => {
     const pkg = packages.find(p => p.identifier === selectedPackage);
@@ -59,7 +117,7 @@ export default function PaywallScreen() {
     } finally {
       setIsPurchasing(false);
     }
-  }, [purchasePackage, packages, selectedPackage, t]);
+  }, [purchasePackage, packages, selectedPackage, t, simulateDevPurchase]);
 
   const handleRestore = useCallback(async () => {
     setIsPurchasing(true);
@@ -76,111 +134,125 @@ export default function PaywallScreen() {
 
   const getButtonLabel = () => {
     if (isAnnualSelected && selectedPkg) {
-      return t('paywall.trial', 'Start Free Trial', { price: selectedPkg.product.priceString });
+      return t('paywall.trial_btn', 'Start Free Trial');
     }
-    return t('onboarding.continue', 'Continue');
+    return t('paywall.continue_btn', 'Continue');
   };
 
   const getTrialDisclaimer = () => {
     if (isAnnualSelected && selectedPkg) {
-      return t('paywall.trial_disclaimer', 'Billed as {{price}}/year after 3-day free trial. Cancel anytime.', { price: selectedPkg.product.priceString });
+      return t('paywall.trial_disclaimer', '3-day free trial, then {{price}}/year', { price: selectedPkg.product.priceString });
     }
     return '';
   };
 
-  const benefits = useMemo(() => [
-    t('paywall.benefit_1', 'Access all 40+ cameras'),
-    t('paywall.benefit_2', 'Infinite resolution export'),
-    t('paywall.benefit_3', 'No ads, no watermarks'),
-    t('paywall.benefit_4', 'Priority AI processing'),
-    t('paywall.benefit_5', 'Exclusive golden hour features'),
-  ], [t]);
-
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.headerRow}>
-        {showCloseButton ? (
-          <TouchableOpacity onPress={() => router.replace('/')} style={styles.closeBtn}>
-            <X size={24} color="#FFF" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.closeBtnPlaceholder} />
-        )}
-      </View>
+    <LinearGradient colors={APP_CONFIG.gradientColors} style={styles.container}>
+      <ScrollView contentContainerStyle={[styles.scroll, isTablet && styles.tabletContent]} showsVerticalScrollIndicator={false}>
 
-      <ScrollView contentContainerStyle={[styles.content, isTablet && styles.tabletContent]}>
-        <View style={styles.heroBox}>
-          <Crown size={64} color="#FFD166" style={{ marginBottom: 12 }} />
-          <Text style={styles.title}>{t('paywall.title', 'Upgrade to PRO')}</Text>
-          <Text style={styles.subtitle}>{t('paywall.subtitle', 'Unlock all cameras and features')}</Text>
+        {/* CLOSE */}
+        <View style={styles.headerRow}>
+          {showCloseButton ? (
+            <TouchableOpacity onPress={() => router.replace('/')} style={styles.closeBtn}>
+              <Text style={styles.closeText}>✕</Text>
+            </TouchableOpacity>
+          ) : <View style={styles.closeBtnPlaceholder} />}
         </View>
 
-        <View style={styles.benefitList}>
-          {benefits.map((b, i) => (
-            <View key={i} style={styles.benefitItem}>
-              <View style={styles.checkIconWrapper}>
-                <CheckCircle2 size={18} color="#FFD166" />
-              </View>
-              <Text style={styles.benefitText}>{b}</Text>
+        {/* ICON */}
+        <View style={styles.iconWrap}>
+          <Image source={require('../assets/images/icon.png')} style={styles.icon} />
+        </View>
+
+        {/* HEADLINE */}
+        <Text style={styles.headline}>{APP_CONFIG.headline}</Text>
+        <Text style={styles.subtitle}>{APP_CONFIG.subtitle}</Text>
+
+        {/* SOCIAL PROOF */}
+        <View style={styles.counterRow}>
+          <View style={styles.counterBadge}>
+            <Text style={styles.counterText}>
+              🔥 {scanCount} {t('paywall.people_verb', 'people {{verb}} right now', { verb: APP_CONFIG.counterVerb })}
+            </Text>
+          </View>
+        </View>
+
+        {/* VISUAL SECTION */}
+        <View style={styles.visualBox}>
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            nativeControls={false}
+            contentFit="cover"
+          />
+          {/* Active label */}
+          <View style={[styles.activeTag, { borderColor: `${APP_CONFIG.accentColor}66` }]}>
+            <Text style={[styles.activeTagText, { color: APP_CONFIG.accentColor }]}>● ACTIVE</Text>
+          </View>
+        </View>
+
+        {/* BENEFITS */}
+        <View style={styles.benefits}>
+          {APP_CONFIG.benefits.map((b) => (
+            <View key={b.text} style={styles.benefitRow}>
+              <Text style={styles.bIcon}>{b.icon}</Text>
+              <Text style={styles.bText}>{b.text}</Text>
             </View>
           ))}
         </View>
 
-        {/* Plan cards */}
-        <View style={styles.plansWrap}>
+        {/* PRICING */}
+        <View style={styles.plans}>
           {isLoading && packages.length === 0 ? (
-            <ActivityIndicator color="#FFD166" style={{ marginVertical: 20 }} />
+            <ActivityIndicator color={APP_CONFIG.accentColor} style={{ marginVertical: 20 }} />
           ) : (
             packages.map((pkg) => {
               const isSelected = selectedPackage === pkg.identifier;
-              const isAnnual = pkg.packageType === 'ANNUAL';
+              const isYearly = pkg.packageType === 'ANNUAL';
               const price = pkg.product.priceString;
 
-              let periodLabel = t('paywall.monthly', 'Monthly');
-              if (isAnnual) periodLabel = t('paywall.yearly', 'Yearly');
-              else if (pkg.packageType === 'WEEKLY') periodLabel = t('paywall.weekly', 'Weekly');
+              let planLabel = t('paywall.monthly', 'Monthly');
+              let planSub = t('paywall.monthly_sub', 'Billed monthly');
+              
+              if (isYearly) {
+                planLabel = t('paywall.yearly', 'Yearly');
+                planSub = t('paywall.yearly_sub', 'Billed yearly');
+              } else if (pkg.packageType === 'WEEKLY') {
+                planLabel = t('paywall.weekly', 'Weekly');
+                planSub = t('paywall.weekly_sub', 'Billed weekly');
+              }
+
+              if (isYearly) {
+                return (
+                  <TouchableOpacity key={pkg.identifier} onPress={() => setSelectedPackage(pkg.identifier)} activeOpacity={0.85}>
+                    <Animated.View style={[styles.card, styles.yearlyCard, { borderColor: APP_CONFIG.accentColor, opacity: glowAnim }]}>
+                      <View style={[styles.yearlyBadge, { backgroundColor: APP_CONFIG.accentColor }]}>
+                        <Animated.Text style={[styles.badgeText, { transform: [{ scale: pulseAnim }] }]}>
+                          ⭐ {t('paywall.best_value', 'BEST VALUE')} ⭐
+                        </Animated.Text>
+                      </View>
+                      <View style={styles.cardRow}>
+                        <View>
+                          <Text style={styles.planLabelLarge}>{planLabel}</Text>
+                          <Text style={[styles.planSub, { color: APP_CONFIG.accentColor }]}>{planSub}</Text>
+                        </View>
+                        <Text style={styles.priceLarge}>{price}</Text>
+                      </View>
+                    </Animated.View>
+                  </TouchableOpacity>
+                );
+              }
 
               return (
-                <TouchableOpacity
-                  key={pkg.identifier}
-                  style={[styles.planCard, isSelected && styles.planCardActive]}
-                  onPress={() => setSelectedPackage(pkg.identifier)}
-                  activeOpacity={0.9}
-                >
-                  {/* Best value badge */}
-                  {isAnnual && (
-                    <View style={styles.bestValueBadge}>
-                      <Text style={styles.bestValueText}>{t('paywall.best_value', 'Best Value')}</Text>
+                <TouchableOpacity key={pkg.identifier} onPress={() => setSelectedPackage(pkg.identifier)} activeOpacity={0.85}>
+                  <View style={[styles.card, isSelected && { borderColor: APP_CONFIG.accentColor, borderWidth: 1.5 }]}>
+                    <View style={styles.cardRow}>
+                      <View>
+                        <Text style={styles.planLabel}>{planLabel}</Text>
+                        <Text style={styles.planSub}>{planSub}</Text>
+                      </View>
+                      <Text style={styles.price}>{price}</Text>
                     </View>
-                  )}
-
-                  <View style={styles.planInfo}>
-                    <View style={styles.planLabelRow}>
-                      <Text style={[styles.planPeriod, isSelected && styles.planPeriodActive]}>
-                        {periodLabel}
-                      </Text>
-                      {/* Trial badge — only on annual */}
-                      {isAnnual && (
-                        <View style={styles.trialBadge}>
-                          <Text style={styles.trialBadgeText}>
-                            {t('paywall.trial_badge', '3-Day Free Trial')}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={[styles.planPrice, isSelected && styles.planPriceActive]}>
-                      {price}
-                    </Text>
-                    {/* "then price/year" hint under annual */}
-                    {isAnnual && (
-                      <Text style={styles.trialThenText}>
-                        {t('paywall.trial_then', 'then {{price}}/year', { price })}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
-                    {isSelected && <View style={styles.radioInner} />}
                   </View>
                 </TouchableOpacity>
               );
@@ -189,24 +261,39 @@ export default function PaywallScreen() {
         </View>
 
         {/* CTA */}
-        <View style={styles.ctaWrapper}>
-          <TouchableOpacity
-            style={[styles.subscribeBtn, (isPurchasing || isLoading) && styles.subscribeBtnDisabled]}
-            onPress={handlePurchase}
-            disabled={isPurchasing || isLoading || !selectedPackage}
+        <TouchableOpacity 
+          onPress={handlePurchase} 
+          disabled={isPurchasing || isLoading || !selectedPackage}
+          activeOpacity={0.88} 
+          style={styles.ctaWrap}
+        >
+          <LinearGradient
+            colors={[(isPurchasing || isLoading || !selectedPackage) ? '#555' : APP_CONFIG.accentColor, (isPurchasing || isLoading || !selectedPackage) ? '#333' : APP_CONFIG.accentColor + 'cc']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.cta}
           >
             {isPurchasing || isLoading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.subscribeBtnText}>{getButtonLabel()}</Text>
+              <Text style={styles.ctaText}>{getButtonLabel()} 🚀</Text>
             )}
-          </TouchableOpacity>
+          </LinearGradient>
+        </TouchableOpacity>
 
-          {getTrialDisclaimer() !== '' && (
-            <Text style={styles.disclaimerText}>{getTrialDisclaimer()}</Text>
-          )}
+        {getTrialDisclaimer() !== '' && (
+          <Text style={styles.trialNote}>
+            {getTrialDisclaimer()}
+          </Text>
+        )}
+
+        {/* TRUST */}
+        <View style={styles.trustRow}>
+          <Text style={styles.trust}>✓ {t('paywall.cancel_anytime', 'Cancel anytime')}</Text>
+          <Text style={styles.trust}>✓ {t('paywall.no_commitment', 'No commitment')}</Text>
+          <Text style={styles.trust}>🔒 {t('paywall.secure_payment', 'Secure payment')}</Text>
         </View>
 
+        {/* FOOTER LINKS */}
         <View style={styles.footerLinks}>
           <TouchableOpacity onPress={() => Linking.openURL('https://semihtrn4.github.io/retrocam_privacy/')}>
             <Text style={styles.legalLink}>{t('common.privacy_policy', 'Privacy Policy')}</Text>
@@ -220,209 +307,78 @@ export default function PaywallScreen() {
             <Text style={styles.legalLink}>{t('paywall.restore', 'Restore')}</Text>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
+  container: { flex: 1 },
+  headerRow: { height: 40, alignItems: 'flex-end', paddingHorizontal: 20 },
+  closeBtn: { padding: 8 },
+  closeBtnPlaceholder: { width: 40, height: 40 },
+  closeText: { color: 'rgba(255,255,255,0.6)', fontSize: 20 },
+  scroll: { padding: 20, paddingTop: 10, paddingBottom: 60 },
+  tabletContent: { maxWidth: 680, alignSelf: 'center', width: '100%' },
+  iconWrap: {
+    alignSelf: 'center', marginBottom: 14,
+    shadowColor: '#FFD166', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5, shadowRadius: 18, elevation: 8,
   },
-  headerRow: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingHorizontal: 20,
+  icon: { width: 72, height: 72, borderRadius: 18 },
+  headline: { color: '#fff', fontSize: 28, fontWeight: '900', textAlign: 'center', letterSpacing: -0.5 },
+  subtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 14, textAlign: 'center', marginTop: 5, marginBottom: 12 },
+  counterRow: { alignItems: 'center', marginBottom: 16 },
+  counterBadge: {
+    backgroundColor: 'rgba(255,209,102,0.12)',
+    borderWidth: 1, borderColor: 'rgba(255,209,102,0.35)',
+    paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20,
   },
-  closeBtn: {
-    width: 40, height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center', alignItems: 'center',
+  counterText: { color: '#FFD166', fontSize: 12, fontWeight: '600' },
+  visualBox: {
+    height: 180, borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#0a0a0a', marginBottom: 16, position: 'relative',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
   },
-  closeBtnPlaceholder: {
-    width: 40, height: 40,
+  activeTag: {
+    position: 'absolute', bottom: 8, right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
   },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+  activeTagText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  benefits: { marginBottom: 20, paddingHorizontal: 10 },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  bIcon: { fontSize: 18, width: 26, textAlign: 'center' },
+  bText: { color: '#E0E0E0', fontSize: 15, fontWeight: '500' },
+  plans: { gap: 10, marginBottom: 20 },
+  card: {
+    padding: 14, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
   },
-  tabletContent: {
-    maxWidth: 680,
-    alignSelf: 'center',
-    width: '100%',
+  yearlyCard: {
+    backgroundColor: 'rgba(255,209,102,0.05)',
+    borderWidth: 2, paddingTop: 26,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 14, elevation: 8,
   },
-  heroBox: {
-    alignItems: 'center',
-    marginBottom: 40,
+  yearlyBadge: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    paddingVertical: 5, borderTopLeftRadius: 13, borderTopRightRadius: 13, alignItems: 'center',
   },
-  title: {
-    color: '#FFF',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  benefitList: {
-    marginBottom: 40,
-    gap: 16,
-    paddingHorizontal: 10,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  checkIconWrapper: {
-    width: 28, height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 209, 102, 0.1)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  benefitText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  plansWrap: {
-    gap: 12,
-    marginBottom: 30,
-  },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#111',
-    borderWidth: 2,
-    borderColor: '#333',
-    padding: 20,
-    borderRadius: 24,
-    position: 'relative',
-  },
-  planCardActive: {
-    borderColor: '#FFD166',
-    backgroundColor: 'rgba(255, 209, 102, 0.05)',
-  },
-  bestValueBadge: {
-    position: 'absolute',
-    top: -12,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -40,
-    backgroundColor: '#FFD166',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  bestValueText: {
-    color: '#000',
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  planInfo: {
-    flex: 1,
-  },
-  planLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  planPeriod: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  planPeriodActive: {
-    color: '#FFD166',
-  },
-  trialBadge: {
-    backgroundColor: 'rgba(255,209,102,0.15)',
-    borderWidth: 1,
-    borderColor: '#FFD166',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  trialBadgeText: {
-    color: '#FFD166',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  planPrice: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  planPriceActive: {
-    color: '#FFF',
-  },
-  trialThenText: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  radioOuter: {
-    width: 24, height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  radioOuterActive: {
-    borderColor: '#FFD166',
-  },
-  radioInner: {
-    width: 12, height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFD166',
-  },
-  ctaWrapper: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  subscribeBtn: {
-    width: '100%',
-    backgroundColor: '#FFD166',
-    paddingVertical: 20,
-    borderRadius: 30,
-    alignItems: 'center',
-  },
-  subscribeBtnDisabled: {
-    opacity: 0.6,
-  },
-  subscribeBtnText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  disclaimerText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  legalLink: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  legalSep: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 12,
-  },
+  badgeText: { color: '#000', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  planLabel: { color: '#aaa', fontSize: 15, fontWeight: '600' },
+  planLabelLarge: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  planSub: { color: '#666', fontSize: 12, marginTop: 2 },
+  price: { color: '#888', fontSize: 18, fontWeight: '700' },
+  priceLarge: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  ctaWrap: { borderRadius: 30, overflow: 'hidden', marginBottom: 10 },
+  cta: { padding: 18, alignItems: 'center' },
+  ctaText: { color: '#000', fontSize: 18, fontWeight: '900', letterSpacing: 0.3 },
+  trialNote: { textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 16 },
+  trustRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  trust: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '500' },
+  footerLinks: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+  legalLink: { color: 'rgba(255,255,255,0.4)', fontSize: 11, textDecorationLine: 'underline' },
+  legalSep: { color: 'rgba(255,255,255,0.2)', fontSize: 11 },
 });

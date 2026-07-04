@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PurchasesProvider, usePurchases } from '@/hooks/usePurchases';
+import { usePurchases } from '@/hooks/usePurchases';
 import { useEffect } from 'react';
 import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,9 +21,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <PurchasesProvider>
-            <RootContent />
-          </PurchasesProvider>
+          <RootContent />
         </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
@@ -31,7 +29,11 @@ export default function RootLayout() {
 }
 
 function RootContent() {
-  const { isOnboardingComplete, isLoading } = usePurchases();
+  const { isOnboardingComplete, isLoading, initialize } = usePurchases();
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   useEffect(() => {
     // LY-3: loading tamamlanınca splash screen'i gizle

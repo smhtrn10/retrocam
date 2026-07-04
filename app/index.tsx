@@ -418,6 +418,10 @@ export default function CameraScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoryList}
             style={styles.categoryBar}
+            nestedScrollEnabled
+            scrollEnabled
+            bounces={false}
+            directionalLockEnabled={false}
           >
              {categories.map((cat) => {
               const isActive = activeCategory === cat;
@@ -767,8 +771,8 @@ const styles = StyleSheet.create({
   captureSpinner: { position: 'absolute' },
 
   // Category bar
-  categoryBar: { maxHeight: 40 },
-  categoryList: { paddingHorizontal: 12, gap: 6, alignItems: 'center', paddingVertical: 4 },
+  categoryBar: { height: 44, flexGrow: 1 },
+  categoryList: { paddingHorizontal: 12, gap: 6, alignItems: 'center', paddingVertical: 4, flexGrow: 1 },
   categoryPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 16,

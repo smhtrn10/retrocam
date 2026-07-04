@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react';
+import { create } from 'zustand';
 import { Platform, Alert } from 'react-native';
 import Purchases, { LOG_LEVEL, PurchasesPackage, CustomerInfo } from 'react-native-purchases';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,92 +18,85 @@ const FALLBACK_PACKAGES: PurchasesPackage[] = [
 ];
 
 let isRevenueCatConfigured = false;
-const PREMIUM_CACHE_KEY = 'is_pro_cache';
+let listenerRemover: (() => void) | void | undefined;
 
+const PREMIUM_CACHE_KEY = 'is_pro_cache';
 const ENTITLEMENT_ID = 'premium';
 const ONBOARDING_KEY = 'onboarding_complete';
 
-interface PurchasesContextType {
+interface PurchasesState {
   isPro: boolean;
   subscriptionPlan: 'annual' | 'monthly' | 'weekly' | null;
   isOnboardingComplete: boolean | null;
+  packages: PurchasesPackage[];
+  isLoading: boolean;
+  activePresetId: string | null;
+
+  initialize: () => Promise<void>;
   setOnboardingComplete: (status: boolean) => Promise<void>;
   showPaywall: (presetId?: string) => void;
   hidePaywall: () => void;
   purchasePackage: (pkg: PurchasesPackage) => Promise<void>;
   simulateDevPurchase: () => Promise<void>;
   restorePurchases: () => Promise<void>;
-  packages: PurchasesPackage[];
-  isLoading: boolean;
-  activePresetId: string | null;
   setIsProOverride: (status: boolean | null) => Promise<void>;
 }
 
-const PurchasesContext = createContext<PurchasesContextType | undefined>(undefined);
-
-export function PurchasesProvider({ children }: { children: ReactNode }) {
-  const [isPro, setIsPro] = useState(false);
-  const [subscriptionPlan, setSubscriptionPlan] = useState<'annual' | 'monthly' | 'weekly' | null>(null);
-  const [isOnboardingComplete, setIsOnboardingComplete] = useState<boolean | null>(null);
-  const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const checkEntitlements = useCallback(async (customerInfo: CustomerInfo) => {
+export const usePurchases = create<PurchasesState>((set, get) => {
+  const checkEntitlements = async (customerInfo: CustomerInfo) => {
     const override = await AsyncStorage.getItem('is_pro_override');
     if (override !== null) {
       const isOverridden = override === 'true';
-      setIsPro(isOverridden);
-      setSubscriptionPlan(isOverridden ? 'annual' : null);
+      set({ isPro: isOverridden, subscriptionPlan: isOverridden ? 'annual' : null });
       return;
     }
     const active = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
-    setIsPro(active);
+    set({ isPro: active });
     AsyncStorage.setItem(PREMIUM_CACHE_KEY, active ? 'true' : 'false').catch(() => { });
 
-    // PR-1: aktif plan tipini belirle
     if (active) {
       const subs = customerInfo.activeSubscriptions;
       if (subs.some(s => s.toLowerCase().includes('annual') || s.toLowerCase().includes('yearly'))) {
-        setSubscriptionPlan('annual');
+        set({ subscriptionPlan: 'annual' });
       } else if (subs.some(s => s.toLowerCase().includes('weekly'))) {
-        setSubscriptionPlan('weekly');
+        set({ subscriptionPlan: 'weekly' });
       } else {
-        setSubscriptionPlan('monthly');
+        set({ subscriptionPlan: 'monthly' });
       }
     } else {
-      setSubscriptionPlan(null);
+      set({ subscriptionPlan: null });
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    // RC-3: listener cleanup için referans tut
-    // Not: react-native-purchases bazı versiyonlarda void döner, bazılarında () => void
-    let listenerRemover: (() => void) | void | undefined;
+  return {
+    isPro: false,
+    subscriptionPlan: null,
+    isOnboardingComplete: null,
+    packages: [],
+    isLoading: true,
+    activePresetId: null,
 
-    const init = async () => {
-      // 1. Önce Onboarding ve depolama durumunu bağımsız yükle (Hata olursa app donmasın)
+    initialize: async () => {
+      if (listenerRemover) return; // Prevent double initialization
+
       try {
         const onboardingStatus = await AsyncStorage.getItem(ONBOARDING_KEY);
-        setIsOnboardingComplete(onboardingStatus === 'true');
+        set({ isOnboardingComplete: onboardingStatus === 'true' });
 
         const override = await AsyncStorage.getItem('is_pro_override');
         if (override !== null) {
           const isOverridden = override === 'true';
-          setIsPro(isOverridden);
-          setSubscriptionPlan(isOverridden ? 'annual' : null);
+          set({ isPro: isOverridden, subscriptionPlan: isOverridden ? 'annual' : null });
         } else {
           const cachedPro = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
           if (cachedPro === 'true') {
-            setIsPro(true);
-            setSubscriptionPlan('annual');
+            set({ isPro: true, subscriptionPlan: 'annual' });
           }
         }
       } catch (e) {
-        setIsOnboardingComplete(false);
+        set({ isOnboardingComplete: false });
       }
 
-      // 2. RevenueCat başlat (Expo Go uygulamasında NativeModule hatası verebilir, bunu yakala)
       try {
         if (process.env.NODE_ENV === 'development') {
           Purchases.setLogLevel(LOG_LEVEL.DEBUG);
@@ -117,152 +110,97 @@ export function PurchasesProvider({ children }: { children: ReactNode }) {
         }
 
         const customerInfo = await Purchases.getCustomerInfo();
-        checkEntitlements(customerInfo);
+        await checkEntitlements(customerInfo);
 
-        // Offerings yükle
         const offerings = await Purchases.getOfferings();
         if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
-          setPackages(offerings.current.availablePackages);
+          set({ packages: offerings.current.availablePackages });
         }
 
-        // RC-3: listener dönüşünü sakla — cleanup için
         listenerRemover = Purchases.addCustomerInfoUpdateListener((info) => {
           checkEntitlements(info);
         });
 
       } catch (err) {
         console.error("Purchase Initialization Error (RevenueCat doesn't work in Expo Go!):", err);
-        // Fallback packages when RevenueCat fails (wrong key, no network, etc.)
-        setPackages(FALLBACK_PACKAGES);
+        set({ packages: FALLBACK_PACKAGES });
       } finally {
-        setIsLoading(false);
+        set({ isLoading: false });
       }
-    };
+    },
 
-    init();
+    setOnboardingComplete: async (status: boolean) => {
+      await AsyncStorage.setItem(ONBOARDING_KEY, status.toString());
+      set({ isOnboardingComplete: status });
+    },
 
-    // RC-3: cleanup — memory leak önleme
-    return () => {
-      if (typeof listenerRemover === 'function') {
-        listenerRemover();
+    showPaywall: (presetId?: string) => {
+      set({ activePresetId: presetId || null });
+      router.push('/paywall');
+    },
+
+    hidePaywall: () => {
+      set({ activePresetId: null });
+      try {
+        router.back();
+      } catch {
+        router.replace('/');
       }
-    };
-  }, [checkEntitlements]);
+    },
 
-  const setOnboardingComplete = async (status: boolean) => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, status.toString());
-    setIsOnboardingComplete(status);
-  };
+    simulateDevPurchase: async () => {
+      set({ isLoading: true });
+      await new Promise<void>(resolve => setTimeout(resolve, 1500));
+      set({ isPro: true, subscriptionPlan: 'annual', isLoading: false });
+      AsyncStorage.setItem(PREMIUM_CACHE_KEY, 'true').catch(() => { });
+      get().hidePaywall();
+    },
 
-  const showPaywall = useCallback((presetId?: string) => {
-    setActivePresetId(presetId || null);
-    router.push('/paywall');
-  }, []);
-
-  const hidePaywall = useCallback(() => {
-    setActivePresetId(null);
-    try {
-      router.back();
-    } catch {
-      router.replace('/');
-    }
-  }, []);
-
-  const simulateDevPurchase = useCallback(async () => {
-    setIsLoading(true);
-    await new Promise<void>(resolve => setTimeout(resolve, 1500));
-    setIsPro(true);
-    setSubscriptionPlan('annual');
-    AsyncStorage.setItem(PREMIUM_CACHE_KEY, 'true').catch(() => { });
-    setIsLoading(false);
-    hidePaywall();
-  }, [hidePaywall]);
-
-  const purchasePackage = useCallback(async (pkg: PurchasesPackage) => {
-    try {
-      setIsLoading(true);
-      const { customerInfo } = await Purchases.purchasePackage(pkg);
-      checkEntitlements(customerInfo);
-      if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
-        hidePaywall();
+    purchasePackage: async (pkg: PurchasesPackage) => {
+      try {
+        set({ isLoading: true });
+        const { customerInfo } = await Purchases.purchasePackage(pkg);
+        await checkEntitlements(customerInfo);
+        if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+          get().hidePaywall();
+        }
+      } catch (err: any) {
+        if (!err.userCancelled) {
+          Alert.alert('Error', err.message);
+        }
+      } finally {
+        set({ isLoading: false });
       }
-    } catch (err: any) {
-      // PW-4: iptal edilince alert gösterme
-      if (!err.userCancelled) {
+    },
+
+    restorePurchases: async () => {
+      try {
+        set({ isLoading: true });
+        const customerInfo = await Purchases.restorePurchases();
+        await checkEntitlements(customerInfo);
+        if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+          Alert.alert('Restored', 'Your subscription was successfully restored.');
+          get().hidePaywall();
+        } else {
+          Alert.alert('Info', 'No active subscription found.');
+        }
+      } catch (err: any) {
         Alert.alert('Error', err.message);
+      } finally {
+        set({ isLoading: false });
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [checkEntitlements, hidePaywall]);
+    },
 
-  const restorePurchases = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const customerInfo = await Purchases.restorePurchases();
-      checkEntitlements(customerInfo);
-      if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
-        Alert.alert('Restored', 'Your subscription was successfully restored.');
-        hidePaywall();
+    setIsProOverride: async (status: boolean | null) => {
+      if (status === null) {
+        await AsyncStorage.removeItem('is_pro_override');
+        const cached = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
+        const isProCached = cached === 'true';
+        set({ isPro: isProCached, subscriptionPlan: isProCached ? 'annual' : null });
       } else {
-        Alert.alert('Info', 'No active subscription found.');
+        await AsyncStorage.setItem('is_pro_override', status ? 'true' : 'false');
+        set({ isPro: status, subscriptionPlan: status ? 'annual' : null });
       }
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [checkEntitlements, hidePaywall]);
-
-  const setIsProOverride = useCallback(async (status: boolean | null) => {
-    if (status === null) {
-      await AsyncStorage.removeItem('is_pro_override');
-      const cached = await AsyncStorage.getItem(PREMIUM_CACHE_KEY);
-      setIsPro(cached === 'true');
-      if (cached === 'true') {
-        setSubscriptionPlan('annual');
-      } else {
-        setSubscriptionPlan(null);
-      }
-    } else {
-      await AsyncStorage.setItem('is_pro_override', status ? 'true' : 'false');
-      setIsPro(status);
-      setSubscriptionPlan(status ? 'annual' : null);
-    }
-  }, []);
-
-  const value = useMemo(
-    () => ({
-      isPro,
-      subscriptionPlan,
-      // LY-2: null durumu korunuyor — layout'ta doğru kontrol yapılabilsin
-      isOnboardingComplete,
-      setOnboardingComplete,
-      showPaywall,
-      hidePaywall,
-      purchasePackage,
-      simulateDevPurchase,
-      restorePurchases,
-      packages,
-      // isLoading: null iken de loading sayılır
-      isLoading: isLoading || isOnboardingComplete === null,
-      activePresetId,
-      setIsProOverride,
-    }),
-    [isPro, subscriptionPlan, isOnboardingComplete, showPaywall, hidePaywall, purchasePackage, simulateDevPurchase, restorePurchases, packages, isLoading, activePresetId, setIsProOverride]
-  );
-
-  return (
-    <PurchasesContext.Provider value={value}>
-      {children}
-    </PurchasesContext.Provider>
-  );
-}
-
-export function usePurchases() {
-  const context = useContext(PurchasesContext);
-  if (context === undefined) {
-    throw new Error('usePurchases must be used within a PurchasesProvider');
-  }
-  return context;
-}
+    },
+  };
+});

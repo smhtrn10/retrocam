@@ -31,6 +31,7 @@ import {
   Turbulence,
   useCanvasRef,
   ImageFormat,
+  Group,
 } from '@shopify/react-native-skia';
 
 function getSeedFromUri(uri: string): number {

@@ -120,31 +120,11 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
     return { startFX, startFY, endFX, endFY, colors };
   }, [settings.lightLeak, uri]);
 
-  const dustParticles = useMemo(() => {
-    if (settings.dust <= 0) return [];
-    const rand = seededRandom(42);
-    return Array.from({ length: Math.floor(settings.dust * 20) }, () => ({
-      x: rand() * width, y: rand() * height,
-      size: rand() * 3 + 1, opacity: rand() * 0.4 + 0.15,
-    }));
-  }, [settings.dust, width, height]);
-
-  const scratches = useMemo(() => {
-    if (settings.dust <= 0.2) return [];
-    const rand = seededRandom(99);
-    return Array.from({ length: Math.floor(settings.dust * 4) }, () => ({
-      x: rand() * width,
-      top: rand() * height * 0.4,
-      h: rand() * height * 0.3 + height * 0.1,
-      opacity: rand() * 0.2 + 0.06,
-    }));
-  }, [settings.dust, width, height]);
-
   if (!image) {
     return <View style={{ width, height, backgroundColor: '#000' }} />;
   }
 
-  const shift = settings.rgbShift * width * 0.015;
+  const shift = settings.rgbShift * width * 0.008;
 
   // Core image with color grading
   const imageLayer = (x: number, y: number, w: number, h: number) => (
@@ -234,18 +214,48 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
         </Rect>
       )}
       {settings.grain > 0 && (
-        <Rect x={x} y={y} width={w} height={h} opacity={settings.grain * 0.55}>
-          <Turbulence freqX={0.65} freqY={0.65} octaves={3} />
-        </Rect>
+        <Group blendMode="overlay" opacity={settings.grain * 0.8}>
+          <Rect x={x} y={y} width={w} height={h}>
+            <Turbulence freqX={0.75} freqY={0.75} octaves={3} seed={getSeedFromUri(uri)} />
+            <ColorMatrix matrix={[
+              0.6, 0, 0, 0, 0.2,
+              0, 0.6, 0, 0, 0.2,
+              0, 0, 0.6, 0, 0.2,
+              0, 0, 0, 1, 0
+            ]} />
+          </Rect>
+        </Group>
       )}
-      {dustParticles.map((p, i) => (
-        <Circle key={`d${i}`} cx={x + p.x} cy={y + p.y} r={p.size / 2}
-          color={`rgba(200,190,170,${p.opacity})`} />
-      ))}
-      {scratches.map((sc, i) => (
-        <Rect key={`sc${i}`} x={x + sc.x} y={y + sc.top} width={1} height={sc.h}
-          color={`rgba(255,255,255,${sc.opacity})`} />
-      ))}
+      {settings.dust > 0 && (
+        <>
+          {/* Organic Procedural Dust */}
+          <Group blendMode="screen" opacity={settings.dust * 0.7}>
+            <Rect x={x} y={y} width={w} height={h}>
+              <Turbulence freqX={0.9} freqY={0.9} octaves={3} seed={getSeedFromUri(uri) + 1} />
+              <ColorMatrix matrix={[
+                14, 0, 0, 0, -12.5,
+                0, 14, 0, 0, -12.5,
+                0, 0, 14, 0, -12.5,
+                0, 0, 0, 1, 0
+              ]} />
+            </Rect>
+          </Group>
+          {/* Organic Procedural Scratches */}
+          {settings.dust > 0.1 && (
+            <Group blendMode="screen" opacity={settings.dust * 0.4}>
+              <Rect x={x} y={y} width={w} height={h}>
+                <Turbulence freqX={0.01} freqY={0.8} octaves={2} seed={getSeedFromUri(uri) + 2} />
+                <ColorMatrix matrix={[
+                  16, 0, 0, 0, -14.8,
+                  0, 16, 0, 0, -14.8,
+                  0, 0, 16, 0, -14.8,
+                  0, 0, 0, 1, 0
+                ]} />
+              </Rect>
+            </Group>
+          )}
+        </>
+      )}
     </Group>
   );
 
