@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,14 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
   const { t } = useTranslation();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
-  const [libraryPermission, requestLibraryPermission] = MediaLibrary.usePermissions();
+  const [libraryPermission, requestLibraryPermission] = MediaLibrary.usePermissions({
+    granularPermissions: ['photo', 'video']
+  });
   
   const alreadyGranted = cameraPermission?.granted && micPermission?.granted && libraryPermission?.granted;
   const [granted, setGranted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isExpoGo, setIsExpoGo] = useState(false);
 
   const tickScale = React.useRef(new Animated.Value(0)).current;
   const tickOp = React.useRef(new Animated.Value(0)).current;
@@ -48,7 +51,20 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
     try {
       const camResult = await requestCameraPermission();
       const micResult = await requestMicPermission();
-      const libResult = await requestLibraryPermission();
+      
+      let libResult = { granted: false };
+      try {
+        libResult = await requestLibraryPermission();
+      } catch (error: any) {
+        // Expo Go limitation - skip MediaLibrary permission
+        if (error?.message?.includes('Expo Go')) {
+          console.warn('Expo Go detected: MediaLibrary permission skipped');
+          setIsExpoGo(true);
+          libResult = { granted: true }; // Allow to continue in Expo Go
+        } else {
+          throw error;
+        }
+      }
 
       if (camResult.granted && micResult.granted && libResult.granted) {
         setGranted(true);
@@ -83,6 +99,14 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
       <Text style={styles.title}>{t('permission.title', 'Access Required')}</Text>
       <Text style={styles.subtitle}>{t('permission.subtitle', 'RetroCam needs access to your camera, microphone, and gallery to capture and save retro-style photos and videos.')}</Text>
 
+      {isExpoGo && (
+        <View style={styles.expoGoWarning}>
+          <Text style={styles.expoGoWarningText}>
+            ⚠️ Running in Expo Go: Gallery permissions limited. For full functionality, build the app.
+          </Text>
+        </View>
+      )}
+
       <View style={styles.permissionList}>
         <View style={styles.permRow}>
           <Text style={styles.permIcon}>📷</Text>
@@ -108,7 +132,7 @@ export const PermissionScreen: React.FC<Props> = ({ onContinue }) => {
       </View>
 
       {/* Tick animation */}
-      {granted && (
+      {granted && !isExpoGo && (
         <Animated.View style={[styles.tickWrap, { opacity: tickOp, transform: [{ scale: tickScale }] }]}>
           <View style={styles.tickCircle}>
             <Text style={styles.tickIcon}>✓</Text>
@@ -181,6 +205,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 36,
+  },
+  expoGoWarning: {
+    backgroundColor: 'rgba(255,165,0,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,165,0,0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    width: '100%',
+  },
+  expoGoWarningText: {
+    color: '#FFA500',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   permissionList: {
     width: '100%',

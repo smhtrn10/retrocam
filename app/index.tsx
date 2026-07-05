@@ -7,9 +7,9 @@ import {
   Text,
   ActivityIndicator,
   Platform,
-  ScrollView,
   Animated,
 } from 'react-native';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -396,52 +396,63 @@ export default function CameraScreen() {
          {showTrending && (
           <View style={styles.trendingPanel}>
             <Text style={styles.trendingTitle}>🔥 {t('common.trending')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingList}>
-              {trendingPresets.map((preset) => (
+            <GHScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              style={{ width: '100%' }}
+              contentContainerStyle={styles.trendingList}
+            >
+              {trendingPresets.map((preset, index) => (
                 <TouchableOpacity
                   key={preset.id}
-                  style={[styles.trendingItem, selectedPreset.id === preset.id && styles.trendingItemActive]}
+                  style={[styles.trendingItem, selectedPreset.id === preset.id && styles.trendingItemActive, { marginRight: index !== trendingPresets.length - 1 ? 6 : 0 }]}
                   onPress={() => handleTrendingSelect(preset)}
                 >
                   <View style={[styles.trendingDot, { backgroundColor: preset.color }]} />
                   <Text style={styles.trendingName} numberOfLines={1}>{preset.name}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </GHScrollView>
           </View>
         )}
 
         {/* Category filter bar */}
         {!isSnapMode && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryList}
-            style={styles.categoryBar}
-            nestedScrollEnabled
-            scrollEnabled
-            bounces={false}
-            directionalLockEnabled={false}
-          >
-             {categories.map((cat) => {
-              const isActive = activeCategory === cat;
-              const icon = cat === 'all' ? '🎞' : CAMERA_TYPE_ICONS[cat as CamType];
-              const label = cat === 'all' ? t('common.all') : t(`camera_types.${cat}`);
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.categoryPill, isActive && styles.categoryPillActive, { paddingHorizontal: 10 * uiScale, paddingVertical: 5 * uiScale }]}
-                  onPress={() => {
-                    setActiveCategory(cat);
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                >
-                  <Text style={[styles.categoryIcon, { fontSize: 12 * uiScale }]}>{icon}</Text>
-                  <Text style={[styles.categoryLabel, { fontSize: 11 * uiScale }, isActive && styles.categoryLabelActive]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.categoryBarWrapper}>
+            <GHScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ width: '100%' }}
+              contentContainerStyle={styles.categoryList}
+            >
+               {categories.map((cat, index) => {
+                const isActive = activeCategory === cat;
+                const icon = cat === 'all' ? '🎞' : CAMERA_TYPE_ICONS[cat as CamType];
+                const label = cat === 'all' ? t('common.all') : t(`camera_types.${cat}`);
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryPill, 
+                      isActive && styles.categoryPillActive, 
+                      { 
+                        paddingHorizontal: 10 * uiScale, 
+                        paddingVertical: 5 * uiScale,
+                        marginRight: index !== categories.length - 1 ? 6 : 0 
+                      }
+                    ]}
+                    onPress={() => {
+                      setActiveCategory(cat);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={[styles.categoryIcon, { fontSize: 12 * uiScale }]}>{icon}</Text>
+                    <Text style={[styles.categoryLabel, { fontSize: 11 * uiScale }, isActive && styles.categoryLabelActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </GHScrollView>
+          </View>
         )}
 
         {/* Camera carousel */}
@@ -734,7 +745,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  trendingList: { paddingHorizontal: 12, gap: 6 },
+  trendingList: { 
+    paddingHorizontal: 12, 
+    flexGrow: 0, 
+    flexDirection: 'row' 
+  },
   trendingItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -771,8 +786,19 @@ const styles = StyleSheet.create({
   captureSpinner: { position: 'absolute' },
 
   // Category bar
-  categoryBar: { height: 44, flexGrow: 1 },
-  categoryList: { paddingHorizontal: 12, gap: 6, alignItems: 'center', paddingVertical: 4, flexGrow: 1 },
+  categoryBarWrapper: {
+    marginBottom: 8,
+    width: '100%',
+  },
+  categoryFlatList: {
+    width: '100%',
+  },
+  categoryList: { 
+    paddingHorizontal: 12, 
+    paddingVertical: 8,
+    flexGrow: 0,
+    flexDirection: 'row',
+  },
   categoryPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 16,
