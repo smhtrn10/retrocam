@@ -60,10 +60,10 @@ export default function PaywallScreen() {
 
   useEffect(() => {
     if (packages.length > 0 && !selectedPackage) {
-      const annual = packages.find(p => p.packageType === 'ANNUAL');
-      const monthly = packages.find(p => p.packageType === 'MONTHLY');
       const weekly = packages.find(p => p.packageType === 'WEEKLY');
-      setSelectedPackage(annual?.identifier || monthly?.identifier || weekly?.identifier || packages[0].identifier);
+      const monthly = packages.find(p => p.packageType === 'MONTHLY');
+      const annual = packages.find(p => p.packageType === 'ANNUAL');
+      setSelectedPackage(weekly?.identifier || monthly?.identifier || annual?.identifier || packages[0].identifier);
     }
   }, [packages, selectedPackage]);
 
