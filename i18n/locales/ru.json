@@ -17,28 +17,64 @@
   "questions": {
     "1": {
       "q": "What is your photography style?",
-      "options": ["Street", "Portrait", "Landscape", "Vintage Aesthetic"]
+      "options": [
+        "Street",
+        "Portrait",
+        "Landscape",
+        "Vintage Aesthetic"
+      ]
     },
     "2": {
       "q": "Do you have analog experience?",
-      "options": ["Never", "A little", "I am a pro"]
+      "options": [
+        "Never",
+        "A little",
+        "I am a pro"
+      ]
     },
     "3": {
       "q": "Favorite film type?",
-      "options": ["Color Film", "B&W Film", "VHS Video", "Polaroid"]
+      "options": [
+        "Color Film",
+        "B&W Film",
+        "VHS Video",
+        "Polaroid"
+      ]
     },
     "4": {
       "q": "What will you use RetroCam for?",
-      "options": ["As a hobby", "Social Media", "Professional work"]
+      "options": [
+        "As a hobby",
+        "Social Media",
+        "Professional work"
+      ]
     }
   },
   "features": {
-    "1": { "title": "Authentic Simulation", "desc": "Real film stocks captured and digitized." },
-    "2": { "title": "120+ Light Effects", "desc": "Leaks, dust, and grain applied dynamically." },
-    "3": { "title": "Precision Control", "desc": "Adjust time, exposure, and focus manually." },
-    "4": { "title": "Sleek Comparison", "desc": "See original vs processed instantly." },
-    "5": { "title": "Premium Unlock", "desc": "Experience vintage analog with zero limits." },
-    "6": { "title": "Used by 1M+ Creators", "desc": "Join our community." }
+    "1": {
+      "title": "Authentic Simulation",
+      "desc": "Real film stocks captured and digitized."
+    },
+    "2": {
+      "title": "120+ Light Effects",
+      "desc": "Leaks, dust, and grain applied dynamically."
+    },
+    "3": {
+      "title": "Precision Control",
+      "desc": "Adjust time, exposure, and focus manually."
+    },
+    "4": {
+      "title": "Sleek Comparison",
+      "desc": "See original vs processed instantly."
+    },
+    "5": {
+      "title": "Premium Unlock",
+      "desc": "Experience vintage analog with zero limits."
+    },
+    "6": {
+      "title": "Used by 1M+ Creators",
+      "desc": "Join our community."
+    }
   },
   "premium_intro": {
     "title": "Go Premium",
@@ -60,12 +96,21 @@
     "per_month": "/month",
     "per_year": "/year",
     "best_value": "Best Value",
+    "trial_btn": "3 дня бесплатно",
+    "weekly_sub": "Еженедельная оплата",
+    "monthly_sub": "Ежемесячная оплата",
+    "yearly_sub": "Ежегодная оплата",
+    "cancel_anytime": "Отмена в любое время",
+    "no_commitment": "Без обязательств",
+    "secure_payment": "Безопасная оплата",
     "restore": "Restore Purchase",
     "trial": "3 дня бесплатно, затем {{price}}/год",
     "trial_badge": "3 дня бесплатно",
     "trial_then": "затем {{price}}/год",
     "then": "then {{price}} {{period}}",
-    "trial_disclaimer": "После 3-дневного пробного периода спишется {{price}}/год. Отмена в любое время.",
+    "trial_disclaimer_weekly": "После 3-дневного пробного периода спишется {{price}}/неделю. Отмена в любое время.",
+    "trial_disclaimer_monthly": "После 3-дневного пробного периода спишется {{price}}/месяц. Отмена в любое время.",
+    "trial_disclaimer_yearly": "После 3-дневного пробного периода спишется {{price}}/год. Отмена в любое время.",
     "package_not_found": "Package not found.",
     "welcome_pro_title": "Welcome to Pro!",
     "start_exploring": "Start Exploring",
@@ -135,5 +180,113 @@
     "16mm": "Кино 16мм",
     "camcorder": "Видеокамера",
     "special": "Специальный"
+  },
+  "onboarding2": {
+    "common": {
+      "skip": "Пропустить",
+      "continue": "Далее"
+    },
+    "hook": {
+      "badge": "2M+ авторов в TikTok",
+      "title_a": "Снимай как в 1998,",
+      "title_b": " одно касание",
+      "subtitle": "Мгновенное плёночное зерно, засветы и тона Y2K. Без редактирования — винтажная эстетика в одно касание.",
+      "normal": "Обычное",
+      "y2k": "Y2K",
+      "cta": "Обзор →"
+    },
+    "filters": {
+      "title_a": "4 культовые",
+      "title_b": " плёночные камеры",
+      "subtitle": "Каждая создана по мотивам настоящих плёнок. Листай и пробуй.",
+      "badge_popular": "Популярная",
+      "cta": "Смотреть видео →"
+    },
+    "video": {
+      "title_a": "Режим видео",
+      "title_b": " 8мм",
+      "subtitle": "Добавь своим видео настоящее зерно 8мм, тёплое мерцание и строки развёртки.",
+      "feature_grain": "Зерно 8мм",
+      "feature_leak": "Засветы",
+      "feature_vhs": "Развёртка VHS",
+      "cta": "Смотреть галерею →"
+    },
+    "album": {
+      "title_a": "Эстетика, которая",
+      "title_b": " стала вирусной",
+      "subtitle": "Образ Y2K с миллионами лайков в Instagram и TikTok. Твой в одно касание.",
+      "review": "Лучшее Y2K-приложение",
+      "review_source": "Отзыв App Store",
+      "cta": "Начнём →"
+    },
+    "vibe": {
+      "title_a": "Какой у тебя",
+      "title_b": " вайб?",
+      "subtitle": "Выбери один, чтобы мы могли советовать фильтры. Можно изменить в любой момент.",
+      "y2k": {
+        "title": "Y2K Glow",
+        "desc": "Яркие, сочные тона CCD"
+      },
+      "90s": {
+        "title": "Зерно 90-х",
+        "desc": "Тёплое, естественное зерно плёнки"
+      },
+      "disposable": {
+        "title": "Disposable",
+        "desc": "Дымчатый пастельный одноразовый лук"
+      },
+      "cta": "Открыть камеру →"
+    },
+    "att": {
+      "title_a": "Персонализируй",
+      "title_b": " свои фильтры",
+      "subtitle": "Разреши нам рекомендовать лучшие Y2K-фильтры. Твои данные никогда не передаются.",
+      "benefit_personalized": {
+        "title": "Персональные рекомендации",
+        "desc": "Подбор фильтров под твой вкус"
+      },
+      "benefit_experience": {
+        "title": "Лучший опыт",
+        "desc": "Помогает улучшать работу приложения"
+      },
+      "benefit_privacy": {
+        "title": "Безопасно и приватно",
+        "desc": "Данные не передаются третьим лицам"
+      },
+      "allow": "Разрешить и начать",
+      "later": "Спросить позже",
+      "requesting": "Запрос…"
+    },
+    "permission": {
+      "title": "Доступ к камере",
+      "subtitle": "RetroCam требуется доступ к камере, микрофону и галерее, чтобы снимать и сохранять винтажные фото и видео.",
+      "expo_warning": "Expo Go: Разрешения галереи ограничены",
+      "camera": {
+        "title": "Камера",
+        "desc": "Снимайте фото и видео"
+      },
+      "microphone": {
+        "title": "Микрофон",
+        "desc": "Записывайте звук вместе с видео"
+      },
+      "gallery": {
+        "title": "Галерея",
+        "desc": "Сохраняйте и редактируйте снимки"
+      },
+      "allow": "Разрешить и продолжить",
+      "skip": "Продолжить →",
+      "granted": "Всё готово!",
+      "requesting": "Запрос…"
+    },
+    "paywall": {
+      "title": "Открой свою винтажную эстетику",
+      "subtitle": "Все 40+ камер, видеофильтры и про-инструменты",
+      "counter": "человек сейчас редактируют",
+      "benefit_1": "Все 40+ винтажных камер",
+      "benefit_2": "Видеофильтры 8мм и VHS",
+      "benefit_3": "Без рекламы и водяных знаков",
+      "benefit_4": "Экспорт в 4K / HD",
+      "benefit_5": "Эксклюзивные засветы и зерно"
+    }
   }
 }

@@ -93,6 +93,12 @@
           "resizeMode": "cover",
           "backgroundColor": "#000000"
         }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "RetroCam uses this identifier to recommend Y2K filters tailored to your taste and to improve app performance. Your data is never shared with third parties."
+        }
       ]
     ],
     "experiments": {

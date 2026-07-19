@@ -13,8 +13,8 @@ const API_KEYS = {
 // These are display-only — actual purchase goes through RevenueCat
 const FALLBACK_PACKAGES: PurchasesPackage[] = [
   { identifier: 'weekly', packageType: 'WEEKLY', product: { priceString: '$0.99', identifier: 'weekly' } } as unknown as PurchasesPackage,
-  { identifier: 'monthly', packageType: 'MONTHLY', product: { priceString: '$4.99', identifier: 'monthly' } } as unknown as PurchasesPackage,
-  { identifier: 'annual', packageType: 'ANNUAL', product: { priceString: '$29.99', identifier: 'annual' } } as unknown as PurchasesPackage,
+  { identifier: 'monthly', packageType: 'MONTHLY', product: { priceString: '$2.99', identifier: 'monthly' } } as unknown as PurchasesPackage,
+  { identifier: 'annual', packageType: 'ANNUAL', product: { priceString: '$14.99', identifier: 'annual' } } as unknown as PurchasesPackage,
 ];
 
 let isRevenueCatConfigured = false;

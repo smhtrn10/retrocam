@@ -17,28 +17,64 @@
   "questions": {
     "1": {
       "q": "What is your photography style?",
-      "options": ["Street", "Portrait", "Landscape", "Vintage Aesthetic"]
+      "options": [
+        "Street",
+        "Portrait",
+        "Landscape",
+        "Vintage Aesthetic"
+      ]
     },
     "2": {
       "q": "Do you have analog experience?",
-      "options": ["Never", "A little", "I am a pro"]
+      "options": [
+        "Never",
+        "A little",
+        "I am a pro"
+      ]
     },
     "3": {
       "q": "Favorite film type?",
-      "options": ["Color Film", "B&W Film", "VHS Video", "Polaroid"]
+      "options": [
+        "Color Film",
+        "B&W Film",
+        "VHS Video",
+        "Polaroid"
+      ]
     },
     "4": {
       "q": "What will you use RetroCam for?",
-      "options": ["As a hobby", "Social Media", "Professional work"]
+      "options": [
+        "As a hobby",
+        "Social Media",
+        "Professional work"
+      ]
     }
   },
   "features": {
-    "1": { "title": "Authentic Simulation", "desc": "Real film stocks captured and digitized." },
-    "2": { "title": "120+ Light Effects", "desc": "Leaks, dust, and grain applied dynamically." },
-    "3": { "title": "Precision Control", "desc": "Adjust time, exposure, and focus manually." },
-    "4": { "title": "Sleek Comparison", "desc": "See original vs processed instantly." },
-    "5": { "title": "Premium Unlock", "desc": "Experience vintage analog with zero limits." },
-    "6": { "title": "Used by 1M+ Creators", "desc": "Join our community." }
+    "1": {
+      "title": "Authentic Simulation",
+      "desc": "Real film stocks captured and digitized."
+    },
+    "2": {
+      "title": "120+ Light Effects",
+      "desc": "Leaks, dust, and grain applied dynamically."
+    },
+    "3": {
+      "title": "Precision Control",
+      "desc": "Adjust time, exposure, and focus manually."
+    },
+    "4": {
+      "title": "Sleek Comparison",
+      "desc": "See original vs processed instantly."
+    },
+    "5": {
+      "title": "Premium Unlock",
+      "desc": "Experience vintage analog with zero limits."
+    },
+    "6": {
+      "title": "Used by 1M+ Creators",
+      "desc": "Join our community."
+    }
   },
   "premium_intro": {
     "title": "Go Premium",
@@ -60,12 +96,21 @@
     "per_month": "/month",
     "per_year": "/year",
     "best_value": "Best Value",
+    "trial_btn": "Teste gratuito de 3 dias",
+    "weekly_sub": "Cobrado semanalmente",
+    "monthly_sub": "Cobrado mensalmente",
+    "yearly_sub": "Cobrado anualmente",
+    "cancel_anytime": "Cancele quando quiser",
+    "no_commitment": "Sem compromisso",
+    "secure_payment": "Pagamento seguro",
     "restore": "Restore Purchase",
     "trial": "3 Dias Grátis, Depois {{price}}/Ano",
     "trial_badge": "3 dias grátis",
     "trial_then": "depois {{price}}/ano",
     "then": "then {{price}} {{period}}",
-    "trial_disclaimer": "Cobrado como {{price}}/ano após a avaliação gratuita de 3 dias. Cancele quando quiser.",
+    "trial_disclaimer_weekly": "Cobrado como {{price}}/semana após a avaliação gratuita de 3 dias. Cancele quando quiser.",
+    "trial_disclaimer_monthly": "Cobrado como {{price}}/mês após a avaliação gratuita de 3 dias. Cancele quando quiser.",
+    "trial_disclaimer_yearly": "Cobrado como {{price}}/ano após a avaliação gratuita de 3 dias. Cancele quando quiser.",
     "package_not_found": "Package not found.",
     "welcome_pro_title": "Welcome to Pro!",
     "start_exploring": "Start Exploring",
@@ -135,5 +180,113 @@
     "16mm": "Cinema 16mm",
     "camcorder": "Filmadora",
     "special": "Especial"
+  },
+  "onboarding2": {
+    "common": {
+      "skip": "Pular",
+      "continue": "Continuar"
+    },
+    "hook": {
+      "badge": "2M+ criadores no TikTok",
+      "title_a": "Fotografe como em 1998,",
+      "title_b": " um toque",
+      "subtitle": "Grão de filme instantâneo, vazamentos de luz e tons Y2K. Sem edição — estética vintage com um toque.",
+      "normal": "Normal",
+      "y2k": "Y2K",
+      "cta": "Explorar →"
+    },
+    "filters": {
+      "title_a": "4 icônicas",
+      "title_b": " câmeras de filme",
+      "subtitle": "Cada uma criada a partir de filmes reais. Deslize e experimente.",
+      "badge_popular": "Popular",
+      "cta": "Ver o vídeo →"
+    },
+    "video": {
+      "title_a": "Modo vídeo",
+      "title_b": " 8mm",
+      "subtitle": "Adicione grão 8mm autêntico, cintilação quente e linhas de varredura retrô aos seus vídeos.",
+      "feature_grain": "Grão 8mm",
+      "feature_leak": "Vazamento de luz",
+      "feature_vhs": "Varredura VHS",
+      "cta": "Ver a galeria →"
+    },
+    "album": {
+      "title_a": "A estética que",
+      "title_b": " viralizou",
+      "subtitle": "O visual Y2K com milhões de curtidas no Instagram e TikTok. Seu com um toque.",
+      "review": "Melhor app de câmera Y2K",
+      "review_source": "Avaliação da App Store",
+      "cta": "Vamos lá →"
+    },
+    "vibe": {
+      "title_a": "Qual é a",
+      "title_b": " sua vibe?",
+      "subtitle": "Escolha uma para recomendarmos filtros. Você pode mudar quando quiser.",
+      "y2k": {
+        "title": "Y2K Glow",
+        "desc": "Tons CCD brilhantes e vibrantes"
+      },
+      "90s": {
+        "title": "Grão anos 90",
+        "desc": "Grão de filme quente e natural"
+      },
+      "disposable": {
+        "title": "Disposable",
+        "desc": "Visual pastel desbotado descartável"
+      },
+      "cta": "Abrir a câmera →"
+    },
+    "att": {
+      "title_a": "Personalize",
+      "title_b": " seus filtros",
+      "subtitle": "Permita-nos recomendar os melhores filtros Y2K para você. Seus dados nunca são compartilhados.",
+      "benefit_personalized": {
+        "title": "Recomendações personalizadas",
+        "desc": "Sugestões baseadas nos estilos que você curte"
+      },
+      "benefit_experience": {
+        "title": "Experiência melhor",
+        "desc": "Nos ajuda a melhorar o desempenho"
+      },
+      "benefit_privacy": {
+        "title": "Seguro e privado",
+        "desc": "Seus dados nunca são compartilhados"
+      },
+      "allow": "Permitir e começar",
+      "later": "Perguntar depois",
+      "requesting": "Solicitando…"
+    },
+    "permission": {
+      "title": "Acesso à Câmera",
+      "subtitle": "RetroCam precisa de acesso à câmera, microfone e galeria para capturar e salvar fotos e vídeos vintage.",
+      "expo_warning": "Expo Go: Permissões de galeria limitadas",
+      "camera": {
+        "title": "Câmera",
+        "desc": "Capturar fotos e vídeos"
+      },
+      "microphone": {
+        "title": "Microfone",
+        "desc": "Gravar áudio com vídeo"
+      },
+      "gallery": {
+        "title": "Galeria",
+        "desc": "Salvar e editar suas capturas"
+      },
+      "allow": "Permitir e Continuar",
+      "skip": "Continuar →",
+      "granted": "Tudo Pronto!",
+      "requesting": "Solicitando…"
+    },
+    "paywall": {
+      "title": "Desbloqueie sua estética vintage",
+      "subtitle": "Todas as 40+ câmeras, filtros de vídeo e ferramentas pro",
+      "counter": "pessoas editando agora",
+      "benefit_1": "Todas as 40+ câmeras vintage",
+      "benefit_2": "Filtros de vídeo 8mm e VHS",
+      "benefit_3": "Sem anúncios nem marcas d'água",
+      "benefit_4": "Exportação em 4K / HD",
+      "benefit_5": "Vazamentos de luz e grãos exclusivos"
+    }
   }
 }

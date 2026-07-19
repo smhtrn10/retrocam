@@ -1,4 +1,112 @@
 {
+  "onboarding2": {
+    "common": {
+      "skip": "Salta",
+      "continue": "Continua"
+    },
+    "hook": {
+      "badge": "2M+ creator su TikTok",
+      "title_a": "Scatta come nel 1998,",
+      "title_b": " un tocco",
+      "subtitle": "Grana di pellicola istantanea, fughe di luce e toni Y2K. Nessuna modifica — estetica vintage con un tocco.",
+      "normal": "Normale",
+      "y2k": "Y2K",
+      "cta": "Esplora →"
+    },
+    "filters": {
+      "title_a": "4 iconiche",
+      "title_b": " fotocamere a pellicola",
+      "subtitle": "Ognuna creata da vere pellicole. Scorri e prova.",
+      "badge_popular": "Popolare",
+      "cta": "Guarda il video →"
+    },
+    "video": {
+      "title_a": "Modalità video",
+      "title_b": " 8mm",
+      "subtitle": "Aggiungi grana 8mm autentica, tremolio caldo e linee di scansione retrò ai tuoi video.",
+      "feature_grain": "Grana 8mm",
+      "feature_leak": "Fughe di luce",
+      "feature_vhs": "Scansione VHS",
+      "cta": "Guarda la galleria →"
+    },
+    "album": {
+      "title_a": "L'estetica diventata",
+      "title_b": " virale",
+      "subtitle": "Il look Y2K con milioni di like su Instagram e TikTok. Tuo con un tocco.",
+      "review": "La migliore app fotocamera Y2K",
+      "review_source": "Recensione App Store",
+      "cta": "Iniziamo →"
+    },
+    "vibe": {
+      "title_a": "Qual è",
+      "title_b": " la tua vibe?",
+      "subtitle": "Scegline una per ricevere consigli sui filtri. Puoi cambiarla quando vuoi.",
+      "y2k": {
+        "title": "Y2K Glow",
+        "desc": "Toni CCD luminosi e vibranti"
+      },
+      "90s": {
+        "title": "Grana anni 90",
+        "desc": "Grana di pellicola calda e naturale"
+      },
+      "disposable": {
+        "title": "Disposable",
+        "desc": "Look pastello sfocato monouso"
+      },
+      "cta": "Apri la fotocamera →"
+    },
+    "att": {
+      "title_a": "Personalizza",
+      "title_b": " i tuoi filtri",
+      "subtitle": "Consentici di consigliarti i migliori filtri Y2K. I tuoi dati non vengono mai condivisi.",
+      "benefit_personalized": {
+        "title": "Consigli personalizzati",
+        "desc": "Suggerimenti basati sui tuoi stili preferiti"
+      },
+      "benefit_experience": {
+        "title": "Esperienza migliore",
+        "desc": "Ci aiuta a migliorare le prestazioni"
+      },
+      "benefit_privacy": {
+        "title": "Sicuro e privato",
+        "desc": "I dati non vengono mai condivisi con terzi"
+      },
+      "allow": "Consenti e inizia",
+      "later": "Chiedi più tardi",
+      "requesting": "Richiesta in corso…"
+    },
+    "permission": {
+      "title": "Accesso alla fotocamera",
+      "subtitle": "RetroCam necessita dell'accesso a fotocamera, microfono e galleria per catturare e salvare foto e video vintage.",
+      "expo_warning": "Expo Go: Permessi galleria limitati",
+      "camera": {
+        "title": "Fotocamera",
+        "desc": "Scatta foto e video"
+      },
+      "microphone": {
+        "title": "Microfono",
+        "desc": "Registra audio con i video"
+      },
+      "gallery": {
+        "title": "Galleria",
+        "desc": "Salva e modifica i tuoi scatti"
+      },
+      "allow": "Consenti e continua",
+      "skip": "Continua →",
+      "granted": "Tutto pronto!",
+      "requesting": "Richiesta in corso…"
+    },
+    "paywall": {
+      "title": "Sblocca la tua estetica vintage",
+      "subtitle": "Tutte le 40+ fotocamere, filtri video e strumenti pro",
+      "counter": "persone stanno modificando ora",
+      "benefit_1": "Tutte le 40+ fotocamere vintage",
+      "benefit_2": "Filtri video 8mm e VHS",
+      "benefit_3": "Niente pubblicità né filigrane",
+      "benefit_4": "Export in qualità 4K / HD",
+      "benefit_5": "Fughe di luce e grana esclusive"
+    }
+  },
   "onboarding": {
     "welcome_title": "RetroCam AI",
     "welcome_subtitle": "Shoot authentic analog, right on your digital device.",
@@ -17,28 +125,64 @@
   "questions": {
     "1": {
       "q": "What is your photography style?",
-      "options": ["Street", "Portrait", "Landscape", "Vintage Aesthetic"]
+      "options": [
+        "Street",
+        "Portrait",
+        "Landscape",
+        "Vintage Aesthetic"
+      ]
     },
     "2": {
       "q": "Do you have analog experience?",
-      "options": ["Never", "A little", "I am a pro"]
+      "options": [
+        "Never",
+        "A little",
+        "I am a pro"
+      ]
     },
     "3": {
       "q": "Favorite film type?",
-      "options": ["Color Film", "B&W Film", "VHS Video", "Polaroid"]
+      "options": [
+        "Color Film",
+        "B&W Film",
+        "VHS Video",
+        "Polaroid"
+      ]
     },
     "4": {
       "q": "What will you use RetroCam for?",
-      "options": ["As a hobby", "Social Media", "Professional work"]
+      "options": [
+        "As a hobby",
+        "Social Media",
+        "Professional work"
+      ]
     }
   },
   "features": {
-    "1": { "title": "Authentic Simulation", "desc": "Real film stocks captured and digitized." },
-    "2": { "title": "120+ Light Effects", "desc": "Leaks, dust, and grain applied dynamically." },
-    "3": { "title": "Precision Control", "desc": "Adjust time, exposure, and focus manually." },
-    "4": { "title": "Sleek Comparison", "desc": "See original vs processed instantly." },
-    "5": { "title": "Premium Unlock", "desc": "Experience vintage analog with zero limits." },
-    "6": { "title": "Used by 1M+ Creators", "desc": "Join our community." }
+    "1": {
+      "title": "Authentic Simulation",
+      "desc": "Real film stocks captured and digitized."
+    },
+    "2": {
+      "title": "120+ Light Effects",
+      "desc": "Leaks, dust, and grain applied dynamically."
+    },
+    "3": {
+      "title": "Precision Control",
+      "desc": "Adjust time, exposure, and focus manually."
+    },
+    "4": {
+      "title": "Sleek Comparison",
+      "desc": "See original vs processed instantly."
+    },
+    "5": {
+      "title": "Premium Unlock",
+      "desc": "Experience vintage analog with zero limits."
+    },
+    "6": {
+      "title": "Used by 1M+ Creators",
+      "desc": "Join our community."
+    }
   },
   "premium_intro": {
     "title": "Go Premium",
@@ -53,19 +197,28 @@
   "paywall": {
     "title": "Upgrade to PRO",
     "subtitle": "Unlock all cameras and features",
-    "weekly": "Weekly",
-    "monthly": "Monthly",
-    "yearly": "Yearly",
-    "per_week": "/week",
-    "per_month": "/month",
-    "per_year": "/year",
-    "best_value": "Best Value",
-    "restore": "Restore Purchase",
+    "weekly": "Settimanale",
+    "monthly": "Mensile",
+    "yearly": "Annuale",
+    "per_week": "/settimana",
+    "per_month": "/mese",
+    "per_year": "/anno",
+    "best_value": "Migliore offerta",
+    "trial_btn": "Prova gratuita di 3 giorni",
+    "weekly_sub": "Fatturato settimanalmente",
+    "monthly_sub": "Fatturato mensilmente",
+    "yearly_sub": "Fatturato annualmente",
+    "cancel_anytime": "Cancella quando vuoi",
+    "no_commitment": "Nessun impegno",
+    "secure_payment": "Pagamento sicuro",
+    "restore": "Ripristina acquisto",
     "trial": "3 Giorni Gratis, poi {{price}}/Anno",
     "trial_badge": "3 giorni gratis",
     "trial_then": "poi {{price}}/anno",
     "then": "then {{price}} {{period}}",
-    "trial_disclaimer": "Addebitato come {{price}}/anno dopo la prova gratuita di 3 giorni. Cancella quando vuoi.",
+    "trial_disclaimer_weekly": "Addebitato come {{price}}/settimana dopo la prova gratuita di 3 giorni. Cancella quando vuoi.",
+    "trial_disclaimer_monthly": "Addebitato come {{price}}/mese dopo la prova gratuita di 3 giorni. Cancella quando vuoi.",
+    "trial_disclaimer_yearly": "Addebitato come {{price}}/anno dopo la prova gratuita di 3 giorni. Cancella quando vuoi.",
     "package_not_found": "Package not found.",
     "welcome_pro_title": "Welcome to Pro!",
     "start_exploring": "Start Exploring",

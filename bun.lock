@@ -32,6 +32,7 @@
         "expo-store-review": "~9.0.9",
         "expo-symbols": "~1.0.8",
         "expo-system-ui": "~6.0.9",
+        "expo-tracking-transparency": "~6.0.8",
         "expo-video": "~3.0.16",
         "expo-web-browser": "~15.0.11",
         "ffmpeg-kit-react-native": "github:jdarshan5/ffmpeg-kit-react-native",
@@ -933,6 +934,8 @@
     "expo-symbols": ["expo-symbols@1.0.8", "", { "dependencies": { "sf-symbols-typescript": "^2.0.0" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, ""],
 
     "expo-system-ui": ["expo-system-ui@6.0.9", "", { "dependencies": { "@react-native/normalize-colors": "0.81.5", "debug": "^4.3.2" }, "peerDependencies": { "expo": "*", "react-native": "*", "react-native-web": "*" } }, ""],
+
+    "expo-tracking-transparency": ["expo-tracking-transparency@6.0.8", "", { "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-4/NW47Kmrtj3J0udUmzxiq01gRY+vG8wFsUop6CTOVWlk+2MypjDFwBSscHcyiS2dJGNQLOQSBZ1RNhLdgSBOQ=="],
 
     "expo-video": ["expo-video@3.0.16", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, ""],
 

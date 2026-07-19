@@ -1,4 +1,112 @@
 {
+  "onboarding2": {
+    "common": {
+      "skip": "Atla",
+      "continue": "Devam"
+    },
+    "hook": {
+      "badge": "TikTok'ta 2M+ içerik üretici",
+      "title_a": "1998'deki gibi",
+      "title_b": " çek",
+      "subtitle": "Anlık film tane, ışık sızıntısı ve Y2K tonları. Düzenleme yok — tek dokunuşla vintage estetik.",
+      "normal": "Normal",
+      "y2k": "Y2K",
+      "cta": "Keşfet →"
+    },
+    "filters": {
+      "title_a": "4 ikonik",
+      "title_b": " film kamerası",
+      "subtitle": "Her biri gerçek film stoklarından esinlenerek tasarlandı. Kaydır ve dene.",
+      "badge_popular": "Popüler",
+      "cta": "Videoyu Gör →"
+    },
+    "video": {
+      "title_a": "8mm film",
+      "title_b": " video modu",
+      "subtitle": "Videolarına otantik 8mm film tane, sıcak titreşim ve eski tarz tarama çizgileri ekle.",
+      "feature_grain": "8mm Tane",
+      "feature_leak": "Işık Sızıntısı",
+      "feature_vhs": "VHS Tarama",
+      "cta": "Galeriyi Gör →"
+    },
+    "album": {
+      "title_a": "Viral olan",
+      "title_b": " estetik",
+      "subtitle": "Instagram ve TikTok'ta milyonlarca beğeni alan Y2K görünümü. Tek dokunuşla sen de yap.",
+      "review": "En iyi Y2K uygulaması",
+      "review_source": "App Store Kullanıcı Yorumu",
+      "cta": "Başlayalım →"
+    },
+    "vibe": {
+      "title_a": "Senin",
+      "title_b": " viben hangisi?",
+      "subtitle": "Sana özel filtreler önermemiz için birini seç. İstediğin zaman değiştirebilirsin.",
+      "y2k": {
+        "title": "Y2K Glow",
+        "desc": "Parlak, canlı CCD tonları"
+      },
+      "90s": {
+        "title": "90s Tane",
+        "desc": "Sıcak, doğal film tane"
+      },
+      "disposable": {
+        "title": "Disposable",
+        "desc": "Bulanık, pastel tek kullanımlık"
+      },
+      "cta": "Kamerayı Aç →"
+    },
+    "att": {
+      "title_a": "Filtrelerini",
+      "title_b": " kişiselleştir",
+      "subtitle": "Sana en uygun Y2K filtrelerini önerebilmemiz için izin ver. Verilerin asla paylaşılmaz.",
+      "benefit_personalized": {
+        "title": "Kişiselleştirilmiş öneriler",
+        "desc": "Beğendiğin tarzlara göre filtre önerisi"
+      },
+      "benefit_experience": {
+        "title": "Daha iyi deneyim",
+        "desc": "Uygulama performansını iyileştirmek için"
+      },
+      "benefit_privacy": {
+        "title": "Güvenli ve gizli",
+        "desc": "Verilerin üçüncü taraflarla paylaşılmaz"
+      },
+      "allow": "İzin Ver ve Başla",
+      "later": "Sonra Sor",
+      "requesting": "İsteniyor…"
+    },
+    "permission": {
+      "title": "Kamera Erişimi",
+      "subtitle": "RetroCam, vintage fotoğraf ve video çekmek için kamera, mikrofon ve galeriye erişim gerektirir.",
+      "expo_warning": "Expo Go: Galeri izinleri sınırlı",
+      "camera": {
+        "title": "Kamera",
+        "desc": "Fotoğraf ve video çek"
+      },
+      "microphone": {
+        "title": "Mikrofon",
+        "desc": "Video ile ses kaydet"
+      },
+      "gallery": {
+        "title": "Galeri",
+        "desc": "Çekimlerini kaydet ve düzenle"
+      },
+      "allow": "İzin Ver ve Devam Et",
+      "skip": "Devam Et →",
+      "granted": "Hazırsın!",
+      "requesting": "İsteniyor…"
+    },
+    "paywall": {
+      "title": "Vintage Estetiğinin Kilidini Aç",
+      "subtitle": "40+ kamera, video filtreleri ve pro araçlar",
+      "counter": "kişi şu anda düzenliyor",
+      "benefit_1": "40+ vintage kameranın tümü",
+      "benefit_2": "8mm & VHS video filtreleri",
+      "benefit_3": "Reklam yok, filigran yok",
+      "benefit_4": "4K / HD dışa aktarım kalitesi",
+      "benefit_5": "Özel ışık sızıntısı ve tane efektleri"
+    }
+  },
   "onboarding": {
     "welcome_title": "RetroCam AI",
     "welcome_subtitle": "Gerçek analog deneyimini dijital cihazınızda yaşayın.",
@@ -17,28 +125,64 @@
   "questions": {
     "1": {
       "q": "Fotoğrafçılık tarzınız nedir?",
-      "options": ["Sokak", "Portre", "Manzara", "Vintage Estetik"]
+      "options": [
+        "Sokak",
+        "Portre",
+        "Manzara",
+        "Vintage Estetik"
+      ]
     },
     "2": {
       "q": "Analog deneyiminiz var mı?",
-      "options": ["Hiç", "Biraz", "Profesyonelim"]
+      "options": [
+        "Hiç",
+        "Biraz",
+        "Profesyonelim"
+      ]
     },
     "3": {
       "q": "Favori film tipiniz?",
-      "options": ["Renkli Film", "Siyah & Beyaz", "VHS Video", "Polaroid"]
+      "options": [
+        "Renkli Film",
+        "Siyah & Beyaz",
+        "VHS Video",
+        "Polaroid"
+      ]
     },
     "4": {
       "q": "RetroCam'i ne için kullanacaksınız?",
-      "options": ["Hobi olarak", "Sosyal Medya", "Profesyonel işler"]
+      "options": [
+        "Hobi olarak",
+        "Sosyal Medya",
+        "Profesyonel işler"
+      ]
     }
   },
   "features": {
-    "1": { "title": "Otantik Simülasyon", "desc": "Gerçek filmler dijitalleştirildi." },
-    "2": { "title": "120+ Işık Efekti", "desc": "Sızıntı, toz ve gren dinamik olarak uygulanır." },
-    "3": { "title": "Hassas Kontrol", "desc": "Zamanı, pozu ve odağı manuel ayarlayın." },
-    "4": { "title": "Etkili Karşılaştırma", "desc": "Orijinal ve işleneni anında görün." },
-    "5": { "title": "Premium Kilidini Aç", "desc": "Sınır tanımadan vintage analog deneyimi." },
-    "6": { "title": "1 Milyon+ Kreatör", "desc": "Topluluğumuza katılın." }
+    "1": {
+      "title": "Otantik Simülasyon",
+      "desc": "Gerçek filmler dijitalleştirildi."
+    },
+    "2": {
+      "title": "120+ Işık Efekti",
+      "desc": "Sızıntı, toz ve gren dinamik olarak uygulanır."
+    },
+    "3": {
+      "title": "Hassas Kontrol",
+      "desc": "Zamanı, pozu ve odağı manuel ayarlayın."
+    },
+    "4": {
+      "title": "Etkili Karşılaştırma",
+      "desc": "Orijinal ve işleneni anında görün."
+    },
+    "5": {
+      "title": "Premium Kilidini Aç",
+      "desc": "Sınır tanımadan vintage analog deneyimi."
+    },
+    "6": {
+      "title": "1 Milyon+ Kreatör",
+      "desc": "Topluluğumuza katılın."
+    }
   },
   "premium_intro": {
     "title": "Premium'a Geç",
@@ -60,12 +204,21 @@
     "per_month": "/ay",
     "per_year": "/yıl",
     "best_value": "En İyi Değer",
+    "trial_btn": "3 Gün Ücretsize Dene",
+    "weekly_sub": "Haftalık faturalandırılır",
+    "monthly_sub": "Aylık faturalandırılır",
+    "yearly_sub": "Yıllık faturalandırılır",
+    "cancel_anytime": "İstediğin zaman iptal et",
+    "no_commitment": "Taahhüt yok",
+    "secure_payment": "Güvenli ödeme",
     "restore": "Satın Almayı Kurtar",
     "trial": "3 Gün Ücretsiz, Sonra {{price}}/Yıl",
     "trial_badge": "3 Gün Ücretsiz",
     "trial_then": "sonra {{price}}/yıl",
     "then": "sonra {{price}} {{period}}",
-    "trial_disclaimer": "{{price}}/yıl olarak faturalandırılır. 3 günlük ücretsiz deneme sonrasında başlar. İstediğin zaman iptal edebilirsin.",
+    "trial_disclaimer_weekly": "{{price}}/hafta olarak faturalandırılır. 3 günlük ücretsiz deneme sonrasında başlar. İstediğin zaman iptal edebilirsin.",
+    "trial_disclaimer_monthly": "{{price}}/ay olarak faturalandırılır. 3 günlük ücretsiz deneme sonrasında başlar. İstediğin zaman iptal edebilirsin.",
+    "trial_disclaimer_yearly": "{{price}}/yıl olarak faturalandırılır. 3 günlük ücretsiz deneme sonrasında başlar. İstediğin zaman iptal edebilirsin.",
     "package_not_found": "Paket bulunamadı.",
     "welcome_pro_title": "Pro'ya Hoş Geldin!",
     "start_exploring": "Keşfetmeye Başla",

@@ -18,7 +18,7 @@ import { X, Crown, RefreshCcw, Mail, Shield, Star } from 'lucide-react-native';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
 
-const SHOW_DEV_TOOLS = false ;
+const SHOW_DEV_TOOLS = true ;
 
 export default function SettingsScreen() {
   const { t } = useTranslation();

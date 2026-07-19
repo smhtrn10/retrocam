@@ -17,28 +17,64 @@
   "questions": {
     "1": {
       "q": "What is your photography style?",
-      "options": ["Street", "Portrait", "Landscape", "Vintage Aesthetic"]
+      "options": [
+        "Street",
+        "Portrait",
+        "Landscape",
+        "Vintage Aesthetic"
+      ]
     },
     "2": {
       "q": "Do you have analog experience?",
-      "options": ["Never", "A little", "I am a pro"]
+      "options": [
+        "Never",
+        "A little",
+        "I am a pro"
+      ]
     },
     "3": {
       "q": "Favorite film type?",
-      "options": ["Color Film", "B&W Film", "VHS Video", "Polaroid"]
+      "options": [
+        "Color Film",
+        "B&W Film",
+        "VHS Video",
+        "Polaroid"
+      ]
     },
     "4": {
       "q": "What will you use RetroCam for?",
-      "options": ["As a hobby", "Social Media", "Professional work"]
+      "options": [
+        "As a hobby",
+        "Social Media",
+        "Professional work"
+      ]
     }
   },
   "features": {
-    "1": { "title": "Authentic Simulation", "desc": "Real film stocks captured and digitized." },
-    "2": { "title": "120+ Light Effects", "desc": "Leaks, dust, and grain applied dynamically." },
-    "3": { "title": "Precision Control", "desc": "Adjust time, exposure, and focus manually." },
-    "4": { "title": "Sleek Comparison", "desc": "See original vs processed instantly." },
-    "5": { "title": "Premium Unlock", "desc": "Experience vintage analog with zero limits." },
-    "6": { "title": "Used by 1M+ Creators", "desc": "Join our community." }
+    "1": {
+      "title": "Authentic Simulation",
+      "desc": "Real film stocks captured and digitized."
+    },
+    "2": {
+      "title": "120+ Light Effects",
+      "desc": "Leaks, dust, and grain applied dynamically."
+    },
+    "3": {
+      "title": "Precision Control",
+      "desc": "Adjust time, exposure, and focus manually."
+    },
+    "4": {
+      "title": "Sleek Comparison",
+      "desc": "See original vs processed instantly."
+    },
+    "5": {
+      "title": "Premium Unlock",
+      "desc": "Experience vintage analog with zero limits."
+    },
+    "6": {
+      "title": "Used by 1M+ Creators",
+      "desc": "Join our community."
+    }
   },
   "premium_intro": {
     "title": "Go Premium",
@@ -60,12 +96,21 @@
     "per_month": "/month",
     "per_year": "/year",
     "best_value": "Best Value",
+    "trial_btn": "3日間無料で試す",
+    "weekly_sub": "毎週請求",
+    "monthly_sub": "毎月請求",
+    "yearly_sub": "毎年請求",
+    "cancel_anytime": "いつでもキャンセル",
+    "no_commitment": "契約不要",
+    "secure_payment": "安全な支払い",
     "restore": "Restore Purchase",
     "trial": "3日間無料、その後{{price}}/年",
     "trial_badge": "3日間無料",
     "trial_then": "その後{{price}}/年",
     "then": "then {{price}} {{period}}",
-    "trial_disclaimer": "3日間の無料トライアル後、{{price}}/年で請求されます。いつでもキャンセルできます。",
+    "trial_disclaimer_weekly": "3日間の無料トライアル後、{{price}}/週で請求されます。いつでもキャンセルできます。",
+    "trial_disclaimer_monthly": "3日間の無料トライアル後、{{price}}/月で請求されます。いつでもキャンセルできます。",
+    "trial_disclaimer_yearly": "3日間の無料トライアル後、{{price}}/年で請求されます。いつでもキャンセルできます。",
     "package_not_found": "Package not found.",
     "welcome_pro_title": "Welcome to Pro!",
     "start_exploring": "Start Exploring",
@@ -135,5 +180,113 @@
     "16mm": "16mmシネマ",
     "camcorder": "ビデオカメラ",
     "special": "スペシャル"
+  },
+  "onboarding2": {
+    "common": {
+      "skip": "スキップ",
+      "continue": "続ける"
+    },
+    "hook": {
+      "badge": "TikTokで2M+のクリエイター",
+      "title_a": "1998年のように、",
+      "title_b": "ワンタップで撮影",
+      "subtitle": "瞬時のフィルムグレイン、光漏れ、Y2Kトーン。編集不要 — ワンタップでヴィンテージ加工。",
+      "normal": "通常",
+      "y2k": "Y2K",
+      "cta": "探索する →"
+    },
+    "filters": {
+      "title_a": "4つの象徴的な",
+      "title_b": "フィルムカメラ",
+      "subtitle": "すべて実際のフィルムストックから作成。スワイプして試してみよう。",
+      "badge_popular": "人気",
+      "cta": "動画を見る →"
+    },
+    "video": {
+      "title_a": "8mmフィルム",
+      "title_b": " ビデオモード",
+      "subtitle": "本物の8mmグレイン、温かみのあるちらつき、レトロな走査線を動画に追加。",
+      "feature_grain": "8mmグレイン",
+      "feature_leak": "光漏れ",
+      "feature_vhs": "VHS走査",
+      "cta": "ギャラリーを見る →"
+    },
+    "album": {
+      "title_a": "バズった",
+      "title_b": "エステティック",
+      "subtitle": "InstagramとTikTokで数百万いいねのY2Kルック。ワンタップであなたのものに。",
+      "review": "最高のY2Kカメラアプリ",
+      "review_source": "App Storeレビュー",
+      "cta": "はじめよう →"
+    },
+    "vibe": {
+      "title_a": "あなたの",
+      "title_b": "バイブは？",
+      "subtitle": "1つ選ぶとフィルターをおすすめします。いつでも変更可能。",
+      "y2k": {
+        "title": "Y2K Glow",
+        "desc": "明るく鮮やかなCCDトーン"
+      },
+      "90s": {
+        "title": "90sグレイン",
+        "desc": "温かく自然なフィルムグレイン"
+      },
+      "disposable": {
+        "title": "Disposable",
+        "desc": "ぼんやりパステルの使い捨てルック"
+      },
+      "cta": "カメラを開く →"
+    },
+    "att": {
+      "title_a": "フィルターを",
+      "title_b": "パーソナライズ",
+      "subtitle": "あなたに最適なY2Kフィルターをおすすめするために許可してください。データが共有されることはありません。",
+      "benefit_personalized": {
+        "title": "パーソナライズされた提案",
+        "desc": "好みのスタイルに基づくフィルター提案"
+      },
+      "benefit_experience": {
+        "title": "より良い体験",
+        "desc": "アプリのパフォーマンス向上に役立ちます"
+      },
+      "benefit_privacy": {
+        "title": "安全でプライベート",
+        "desc": "データが第三者と共有されることはありません"
+      },
+      "allow": "許可して開始",
+      "later": "後で確認",
+      "requesting": "リクエスト中…"
+    },
+    "permission": {
+      "title": "カメラへのアクセス",
+      "subtitle": "ビンテージ写真や動画を撮影・保存するには、カメラ、マイク、ギャラリーへのアクセスが必要です。",
+      "expo_warning": "Expo Go：ギャラリーの権限が制限されています",
+      "camera": {
+        "title": "カメラ",
+        "desc": "写真や動画を撮影"
+      },
+      "microphone": {
+        "title": "マイク",
+        "desc": "動画と一緒に音声を録音"
+      },
+      "gallery": {
+        "title": "ギャラリー",
+        "desc": "撮影したものを保存・編集"
+      },
+      "allow": "許可して続ける",
+      "skip": "続ける →",
+      "granted": "準備完了！",
+      "requesting": "リクエスト中…"
+    },
+    "paywall": {
+      "title": "ヴィンテージエステティックを解放",
+      "subtitle": "40+のカメラ、ビデオフィルター、プロツール",
+      "counter": "人が今編集中",
+      "benefit_1": "40+のヴィンテージカメラすべて",
+      "benefit_2": "8mm & VHSビデオフィルター",
+      "benefit_3": "広告なし、透かしなし",
+      "benefit_4": "4K / HD書き出し品質",
+      "benefit_5": "限定の光漏れ＆グレイン"
+    }
   }
 }

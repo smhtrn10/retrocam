@@ -1,184 +1,153 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Alert } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, Animated, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { usePurchases } from '@/hooks/usePurchases';
-import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Localization from 'expo-localization';
-import i18n from '@/i18n';
-import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen';
-import { ChatBubble } from '@/components/onboarding/ChatBubble';
-import { MascotCharacter } from '@/components/onboarding/MascotCharacter';
-import { OptionCards } from '@/components/onboarding/OptionCards';
-import { BuildingScreen } from '@/components/onboarding/BuildingScreen';
-import { FeatureSlides } from '@/components/onboarding/FeatureSlides';
-import { StarBurstScreen } from '@/components/onboarding/StarBurstScreen';
-import { PremiumIntroScreen } from '@/components/onboarding/PremiumIntroScreen';
-import { PermissionScreen } from '@/components/onboarding/PermissionScreen';
-import PaywallModal from './paywall';
 
-type OnboardingPhase = 'welcome' | 'permissions' | 'chat' | 'building' | 'features' | 'starburst' | 'premiumIntro';
+import { HookScreen } from '@/components/onboarding2/HookScreen';
+import { FiltersScreen } from '@/components/onboarding2/FiltersScreen';
+import { VideoScreen } from '@/components/onboarding2/VideoScreen';
+import { AlbumScreen } from '@/components/onboarding2/AlbumScreen';
+import { VibeScreen } from '@/components/onboarding2/VibeScreen';
+import { ATTScreen } from '@/components/onboarding2/ATTScreen';
+import { PermissionScreen } from '@/components/onboarding2/PermissionScreen';
+import { PaywallScreen2 } from '@/components/onboarding2/PaywallScreen2';
+import { FilmGrain, LightLeak } from '@/components/onboarding2/components';
+import { OnboardingChrome } from '@/components/onboarding2/OnboardingChrome';
+
+type Phase = 'hook' | 'filters' | 'video' | 'album' | 'vibe' | 'att' | 'permission' | 'paywall';
+
+// Content screens that show progress dots (reference design: 5 dots)
+const DOT_PHASES: Phase[] = ['hook', 'filters', 'video', 'album', 'vibe'];
 
 export default function OnboardingScreen() {
-  const { t } = useTranslation();
-  const { setOnboardingComplete, showPaywall, isOnboardingComplete: isComplete } = usePurchases();
-  
-  const [phase, setPhase] = useState<OnboardingPhase>('welcome');
-  const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [optionsVisible, setOptionsVisible] = useState(false);
-  const [answers, setAnswers] = useState<{ [key: string]: string }>({});
+  const { setOnboardingComplete } = usePurchases();
+  const insets = useSafeAreaInsets();
 
+  const [phase, setPhase] = useState<Phase>('hook');
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const shutterFlash = useRef(new Animated.Value(0)).current;
+  const glitchX = useRef(new Animated.Value(0)).current;
+  const glitchOp = useRef(new Animated.Value(0)).current;
 
-  // Language check on mount
-  useEffect(() => {
-    const checkLang = async () => {
-      const systemLang = Localization.getLocales()[0]?.languageCode || 'en';
-      if (systemLang !== 'en' && i18n.language === 'en') {
-        Alert.alert(
-          t('onboarding.lang_approval.title', 'Language Detection'),
-          t('onboarding.lang_approval.desc', 'Switch language?'),
-          [
-            { text: 'No', style: 'cancel' },
-            { 
-              text: 'Yes', 
-              onPress: async () => {
-                await i18n.changeLanguage(systemLang);
-                await AsyncStorage.setItem('user-language', systemLang);
-              } 
-            }
-          ]
-        );
-      }
-    };
-    checkLang();
-  }, [t]);
+  // Shutter flash effect (filters → video transition)
+  const triggerShutter = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(shutterFlash, { toValue: 0.9, duration: 75, useNativeDriver: true }),
+      Animated.timing(shutterFlash, { toValue: 0, duration: 100, useNativeDriver: true }),
+    ]).start();
+  }, [shutterFlash]);
 
+  // VHS glitch effect (video → album transition) — once per flow
+  const glitchUsed = useRef(false);
+  const triggerGlitch = useCallback(() => {
+    if (glitchUsed.current) return;
+    glitchUsed.current = true;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(glitchOp, { toValue: 1, duration: 80, useNativeDriver: true }),
+        Animated.timing(glitchX, { toValue: 3, duration: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(glitchOp, { toValue: 0.8, duration: 80, useNativeDriver: true }),
+        Animated.timing(glitchX, { toValue: -3, duration: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(glitchX, { toValue: 2, duration: 80, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(glitchOp, { toValue: 0, duration: 160, useNativeDriver: true }),
+        Animated.timing(glitchX, { toValue: 0, duration: 160, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [glitchOp, glitchX]);
 
+  const transitionTo = useCallback(
+    (next: Phase, effect?: 'shutter' | 'glitch') => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (effect === 'shutter') triggerShutter();
+      if (effect === 'glitch') triggerGlitch();
+      Animated.timing(fadeAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+        setPhase(next);
+        Animated.timing(fadeAnim, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+      });
+    },
+    [fadeAnim, triggerShutter, triggerGlitch]
+  );
 
-  const QUESTIONS = [
-    { id: 1, type: 'single', q: 'questions.1.q', options: 'questions.1.options' },
-    { id: 2, type: 'single', q: 'questions.2.q', options: 'questions.2.options' },
-    { id: 3, type: 'single', q: 'questions.3.q', options: 'questions.3.options' },
-    { id: 4, type: 'single', q: 'questions.4.q', options: 'questions.4.options' }
-  ];
+  const finishOnboarding = useCallback(async () => {
+    await setOnboardingComplete(true);
+    router.replace('/');
+  }, [setOnboardingComplete]);
 
-  const transitionTo = (nextPhase: OnboardingPhase, cb?: () => void) => {
-    Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-      setPhase(nextPhase);
-      if (cb) cb();
-      Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-    });
-  };
+  // Skip jumps straight to vibe (last content step, per reference design)
+  const handleSkip = useCallback(() => transitionTo('vibe'), [transitionTo]);
 
-  const handleOptionSelect = (value: string) => {
-    setAnswers(prev => ({ ...prev, [currentQuestion]: value }));
-    setOptionsVisible(false);
-    
-    setTimeout(() => {
-      if (currentQuestion < QUESTIONS.length) {
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          setCurrentQuestion(prev => prev + 1);
-          Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-        });
-      } else {
-        transitionTo('building');
-      }
-    }, 300);
-  };
-
-  const renderActivePhase = () => {
-    switch (phase) {
-      case 'welcome':
-        return (
-          <WelcomeScreen 
-            onContinue={() => transitionTo('permissions')}
-            title={t('onboarding.welcome_title', 'RetroCam AI')}
-            subtitle={t('onboarding.welcome_subtitle', 'Shoot authentic analog.')}
-            buttonText={t('onboarding.start', 'Get Started')}
-          />
-        );
-      case 'permissions':
-        return (
-          <PermissionScreen
-            onContinue={() => transitionTo('chat')}
-          />
-        );
-      case 'chat':
-        const qData = QUESTIONS[currentQuestion - 1];
-        const optionsList = t(qData.options, { returnObjects: true }) as string[];
-
-        return (
-          <View style={styles.chatPhase}>
-            <MascotCharacter emoji="📸" triggerAnimation={currentQuestion} />
-            <ChatBubble 
-              key={currentQuestion}
-              text={t(qData.q, 'Question?')}
-              onComplete={() => setOptionsVisible(true)}
-              typingSpeed={25}
-            />
-            <OptionCards 
-              options={optionsList}
-              visible={optionsVisible}
-              onSelect={handleOptionSelect}
-            />
-          </View>
-        );
-      case 'building':
-        return (
-          <BuildingScreen 
-            title={t('onboarding.building_title', 'Setting up...')}
-            subtitle={t('onboarding.building_subtitle', 'Calibrating filters')}
-            onComplete={() => transitionTo('features')}
-          />
-        );
-      case 'features':
-        return (
-          <FeatureSlides 
-            onComplete={() => transitionTo('starburst')}
-          />
-        );
-      case 'starburst':
-        return (
-          <StarBurstScreen 
-            title={t('onboarding.starburst_title', 'Cameras Ready! 🎉')}
-            onComplete={() => transitionTo('premiumIntro')}
-          />
-        );
-      case 'premiumIntro':
-        return (
-          <PremiumIntroScreen 
-            onContinue={async () => {
-              await setOnboardingComplete(true);
-              router.replace('/paywall');
-            }}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const dotIndex = DOT_PHASES.indexOf(phase);
+  const showChrome = dotIndex >= 0;
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {renderActivePhase()}
+      {/* Ambient light leak */}
+      <LightLeak />
+
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateX: glitchX }],
+          },
+        ]}
+      >
+        {/* VHS glitch tint overlay */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.glitchTint, { opacity: glitchOp }]}
+          pointerEvents="none"
+        />
+
+        {/* Top chrome: dots centered, skip right */}
+        {showChrome && (
+          <OnboardingChrome
+            total={DOT_PHASES.length}
+            active={dotIndex}
+            onSkip={handleSkip}
+            topInset={insets.top + (Platform.OS === 'ios' ? 4 : 8)}
+          />
+        )}
+
+        {phase === 'hook' && <HookScreen onNext={() => transitionTo('filters')} />}
+        {phase === 'filters' && <FiltersScreen onNext={() => transitionTo('video', 'shutter')} />}
+        {phase === 'video' && <VideoScreen onNext={() => transitionTo('album', 'glitch')} />}
+        {phase === 'album' && <AlbumScreen onNext={() => transitionTo('vibe')} />}
+        {phase === 'vibe' && <VibeScreen onNext={() => transitionTo('att')} />}
+        {phase === 'att' && <ATTScreen onDone={() => transitionTo('permission')} />}
+        {phase === 'permission' && <PermissionScreen onDone={() => transitionTo('paywall')} />}
+        {phase === 'paywall' && <PaywallScreen2 onClose={finishOnboarding} />}
       </Animated.View>
+
+      {/* Shutter flash overlay */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, styles.flash, { opacity: shutterFlash }]}
+        pointerEvents="none"
+      />
+
+      {/* Film grain over everything */}
+      <FilmGrain />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  content: { flex: 1, paddingBottom: 34 },
+  glitchTint: {
+    backgroundColor: 'rgba(232,168,124,0.08)',
+    zIndex: 10,
   },
-  content: {
-    flex: 1,
+  flash: {
+    backgroundColor: '#fff',
+    zIndex: 999,
   },
-  chatPhase: {
-    flex: 1,
-    paddingTop: 80,
-    backgroundColor: '#000',
-  }
 });
