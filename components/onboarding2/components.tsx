@@ -12,21 +12,23 @@ import { useTranslation } from 'react-i18next';
 import { OB2_COLORS, OB2_GRADIENTS } from './theme';
 
 // ─── Film grain overlay (SVG turbulence, matches reference HTML) ───
-let FilmGrain: React.FC = () => null;
+let FilmGrain: React.FC = function FilmGrain() { return null; };
 try {
   const { Svg, Defs, Filter, FeTurbulence, Rect } = require('react-native-svg');
-  FilmGrain = () => (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Svg width="100%" height="100%">
-        <Defs>
-          <Filter id="noise">
-            <FeTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch" />
-          </Filter>
-        </Defs>
-        <Rect width="100%" height="100%" filter="url(#noise)" opacity="0.05" />
-      </Svg>
-    </View>
-  );
+  FilmGrain = function FilmGrain() {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <Filter id="noise">
+              <FeTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch" />
+            </Filter>
+          </Defs>
+          <Rect width="100%" height="100%" filter="url(#noise)" opacity="0.05" />
+        </Svg>
+      </View>
+    );
+  };
 } catch {}
 
 export { FilmGrain };

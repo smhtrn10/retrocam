@@ -30,7 +30,7 @@ export const PermissionScreen: React.FC<Props> = ({ onDone }) => {
   useEffect(() => {
     const checkMedia = async () => {
       try {
-        const result = await MediaLibrary.getPermissionsAsync();
+        const result = await MediaLibrary.getPermissionsAsync(false, ['photo', 'video']);
         setLibraryPermission(result);
       } catch (e: any) {
         if (e?.message?.includes('Expo Go')) {
@@ -81,7 +81,7 @@ export const PermissionScreen: React.FC<Props> = ({ onDone }) => {
       let libResult = { granted: false };
       try {
         if (!isExpoGo) {
-          libResult = await MediaLibrary.requestPermissionsAsync();
+          libResult = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
         } else {
           libResult = { granted: true };
         }

@@ -75,27 +75,6 @@
       "later": "Me demander plus tard",
       "requesting": "Demande en cours…"
     },
-    "permission": {
-      "title": "Accès à l'appareil",
-      "subtitle": "RetroCam a besoin d'accéder à votre appareil photo, microphone et galerie pour capturer et enregistrer vos photos et vidéos vintage.",
-      "expo_warning": "Expo Go : Autorisations de galerie limitées",
-      "camera": {
-        "title": "Appareil photo",
-        "desc": "Prendre des photos et vidéos"
-      },
-      "microphone": {
-        "title": "Microphone",
-        "desc": "Enregistrer l'audio avec la vidéo"
-      },
-      "gallery": {
-        "title": "Galerie",
-        "desc": "Enregistrer et modifier vos clichés"
-      },
-      "allow": "Autoriser et continuer",
-      "skip": "Continuer →",
-      "granted": "Tout est prêt !",
-      "requesting": "Demande en cours…"
-    },
     "paywall": {
       "title": "Débloquez votre esthétique vintage",
       "subtitle": "Les 40+ caméras, filtres vidéo et outils pro",

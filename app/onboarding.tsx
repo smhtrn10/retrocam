@@ -10,13 +10,12 @@ import { FiltersScreen } from '@/components/onboarding2/FiltersScreen';
 import { VideoScreen } from '@/components/onboarding2/VideoScreen';
 import { AlbumScreen } from '@/components/onboarding2/AlbumScreen';
 import { VibeScreen } from '@/components/onboarding2/VibeScreen';
-import { ATTScreen } from '@/components/onboarding2/ATTScreen';
 import { PermissionScreen } from '@/components/onboarding2/PermissionScreen';
 import { PaywallScreen2 } from '@/components/onboarding2/PaywallScreen2';
 import { FilmGrain, LightLeak } from '@/components/onboarding2/components';
 import { OnboardingChrome } from '@/components/onboarding2/OnboardingChrome';
 
-type Phase = 'hook' | 'filters' | 'video' | 'album' | 'vibe' | 'att' | 'permission' | 'paywall';
+type Phase = 'hook' | 'filters' | 'video' | 'album' | 'vibe' | 'permission' | 'paywall';
 
 // Content screens that show progress dots (reference design: 5 dots)
 const DOT_PHASES: Phase[] = ['hook', 'filters', 'video', 'album', 'vibe'];
@@ -121,8 +120,7 @@ export default function OnboardingScreen() {
         {phase === 'filters' && <FiltersScreen onNext={() => transitionTo('video', 'shutter')} />}
         {phase === 'video' && <VideoScreen onNext={() => transitionTo('album', 'glitch')} />}
         {phase === 'album' && <AlbumScreen onNext={() => transitionTo('vibe')} />}
-        {phase === 'vibe' && <VibeScreen onNext={() => transitionTo('att')} />}
-        {phase === 'att' && <ATTScreen onDone={() => transitionTo('permission')} />}
+        {phase === 'vibe' && <VibeScreen onNext={() => transitionTo('permission')} />}
         {phase === 'permission' && <PermissionScreen onDone={() => transitionTo('paywall')} />}
         {phase === 'paywall' && <PaywallScreen2 onClose={finishOnboarding} />}
       </Animated.View>

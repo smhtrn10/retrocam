@@ -18,7 +18,7 @@ import { X, Crown, RefreshCcw, Mail, Shield, Star } from 'lucide-react-native';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
 
-const SHOW_DEV_TOOLS = true ;
+const SHOW_DEV_TOOLS = false ;
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
         )}
 
         <View style={styles.footer}>
-          <Text style={[styles.version, { fontSize: 13 * uiScale }]}>RetroCam AI v1.0</Text>
+          <Text style={[styles.version, { fontSize: 13 * uiScale }]}>RetroCam AI v1.0.2</Text>
           <Text style={[styles.copyright, { fontSize: 12 * uiScale }]}>Made with love for vintage photography</Text>
         </View>
       </ScrollView>
