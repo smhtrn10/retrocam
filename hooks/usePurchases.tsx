@@ -11,10 +11,56 @@ const API_KEYS = {
 
 // Fallback prices shown when RevenueCat can't load (wrong key, no network, etc.)
 // These are display-only — actual purchase goes through RevenueCat
-const FALLBACK_PACKAGES: PurchasesPackage[] = [
-  { identifier: 'weekly', packageType: 'WEEKLY', product: { priceString: '$0.99', identifier: 'weekly' } } as unknown as PurchasesPackage,
-  { identifier: 'monthly', packageType: 'MONTHLY', product: { priceString: '$2.99', identifier: 'monthly' } } as unknown as PurchasesPackage,
-  { identifier: 'annual', packageType: 'ANNUAL', product: { priceString: '$14.99', identifier: 'annual' } } as unknown as PurchasesPackage,
+export const FALLBACK_PACKAGES: PurchasesPackage[] = [
+  {
+    identifier: 'annual',
+    packageType: 'ANNUAL' as any,
+    product: {
+      identifier: 'retrocam_annual',
+      price: 14.99,
+      priceString: '$14.99',
+      currencyCode: 'USD',
+      title: 'Annual Pro',
+      description: 'Annual subscription with 3-day free trial',
+      subscriptionPeriod: 'P1Y',
+      introPrice: {
+        price: 0,
+        priceString: '$0.00',
+        cycles: 1,
+        period: 'P3D',
+        periodUnit: 'DAY',
+        periodNumberOfUnits: 3,
+      },
+    },
+  } as unknown as PurchasesPackage,
+  {
+    identifier: 'monthly',
+    packageType: 'MONTHLY' as any,
+    product: {
+      identifier: 'retrocam_monthly',
+      price: 2.99,
+      priceString: '$2.99',
+      currencyCode: 'USD',
+      title: 'Monthly Pro',
+      description: 'Monthly subscription',
+      subscriptionPeriod: 'P1M',
+      introPrice: null,
+    },
+  } as unknown as PurchasesPackage,
+  {
+    identifier: 'weekly',
+    packageType: 'WEEKLY' as any,
+    product: {
+      identifier: 'retrocam_weekly',
+      price: 0.99,
+      priceString: '$0.99',
+      currencyCode: 'USD',
+      title: 'Weekly Pro',
+      description: 'Weekly subscription',
+      subscriptionPeriod: 'P1W',
+      introPrice: null,
+    },
+  } as unknown as PurchasesPackage,
 ];
 
 let isRevenueCatConfigured = false;
@@ -93,7 +139,7 @@ export const usePurchases = create<PurchasesState>((set, get) => {
             set({ isPro: true, subscriptionPlan: 'annual' });
           }
         }
-      } catch (e) {
+      } catch {
         set({ isOnboardingComplete: false });
       }
 
@@ -115,6 +161,9 @@ export const usePurchases = create<PurchasesState>((set, get) => {
         const offerings = await Purchases.getOfferings();
         if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
           set({ packages: offerings.current.availablePackages });
+        } else {
+          console.warn("No active offering packages found in RevenueCat, using FALLBACK_PACKAGES");
+          set({ packages: FALLBACK_PACKAGES });
         }
 
         listenerRemover = Purchases.addCustomerInfoUpdateListener((info) => {

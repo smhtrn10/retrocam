@@ -33,6 +33,13 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascApiKeyPath": "./credentials/AuthKey_KLVPAWH4WV.p8",
+        "ascApiKeyId": "KLVPAWH4WV",
+        "ascApiKeyIssuerId": "1b50e070-85c5-451c-b880-b962050b9ac0",
+        "ascAppId": "6761753420"
+      }
+    }
   }
 }

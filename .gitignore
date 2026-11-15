@@ -7,3 +7,5 @@ expo-env.d.ts
 # @end expo-cli
 ios/
 android/
+# EAS submit ASC API key (gizli)
+credentials/

@@ -32,6 +32,149 @@ import { CameraPreset, CameraType as CamType, CAMERA_PRESETS, CAMERA_TYPE_ICONS,
 import { usePurchases } from '@/hooks/usePurchases';
 import { useTrending } from '@/hooks/useTrending';
 import { useDevice } from '@/hooks/useDevice';
+import { CAMERA_LENSES, LensType } from '@/constants/lenses';
+import { playMechanicalShutterSound } from '@/utils/soundEngine';
+
+// ─────────────────────────────────────────────────────────────
+//  Viewfinder HUD Overlay (Requirement R6)
+// ─────────────────────────────────────────────────────────────
+interface ViewfinderHudProps {
+  preset: CameraPreset;
+  uiScale: number;
+}
+
+function ViewfinderHud({ preset, uiScale }: ViewfinderHudProps) {
+  const isCamcorder = preset.frameType === 'camcorder' || preset.cameraType === 'camcorder' || preset.cameraType === 'vhs';
+  const isDigital = preset.frameType === 'digital' || preset.cameraType === 'digital-y2k';
+  const isHalfFrame = preset.frameType === 'half-frame' || preset.cameraType === 'half-frame';
+  const isAnalog35mm = !isHalfFrame && (preset.cameraType === '35mm' || preset.cameraType === 'disposable' || preset.frameType === 'disposable');
+
+  // Camcorder blinking REC animation (native driver)
+  const recBlinkAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isCamcorder) return;
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recBlinkAnim, { toValue: 0.15, duration: 600, useNativeDriver: true }),
+        Animated.timing(recBlinkAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
+  }, [isCamcorder, recBlinkAnim]);
+
+  // Camcorder live timecode running clock (isolated to prevent full CameraScreen re-renders)
+  const [hudTime, setHudTime] = useState(() => new Date());
+  useEffect(() => {
+    if (!isCamcorder) return;
+    const interval = setInterval(() => {
+      setHudTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isCamcorder]);
+
+  const timecodeStr = useMemo(() => {
+    const h = String(hudTime.getHours()).padStart(2, '0');
+    const m = String(hudTime.getMinutes()).padStart(2, '0');
+    const s = String(hudTime.getSeconds()).padStart(2, '0');
+    return `TC ${h}:${m}:${s}`;
+  }, [hudTime]);
+
+  if (!isCamcorder && !isDigital && !isHalfFrame && !isAnalog35mm) {
+    return null;
+  }
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {/* ── 1. Camcorder Mode HUD ── */}
+      {isCamcorder && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={[styles.hudTopBar, { paddingHorizontal: 12 * uiScale, paddingTop: 10 * uiScale }]}>
+            <Animated.View style={[styles.hudRecRow, { opacity: recBlinkAnim }]}>
+              <View style={[styles.hudRecDot, { width: 9 * uiScale, height: 9 * uiScale, borderRadius: 4.5 * uiScale }]} />
+              <Text style={[styles.hudRecText, { fontSize: 11 * uiScale }]}>REC</Text>
+            </Animated.View>
+            <Text style={[styles.hudCamcorderFormat, { fontSize: 11 * uiScale }]}>SP  Hi8</Text>
+            <View style={styles.hudBatteryRow}>
+              <View style={[styles.hudBatteryBox, { width: 22 * uiScale, height: 11 * uiScale }]}>
+                <View style={[styles.hudBatterySegment, { width: 4 * uiScale, height: 7 * uiScale }]} />
+                <View style={[styles.hudBatterySegment, { width: 4 * uiScale, height: 7 * uiScale }]} />
+                <View style={[styles.hudBatterySegment, { width: 4 * uiScale, height: 7 * uiScale }]} />
+              </View>
+              <View style={[styles.hudBatteryNub, { width: 2.5 * uiScale, height: 5 * uiScale }]} />
+            </View>
+          </View>
+          <View style={[styles.hudBottomBar, { paddingHorizontal: 12 * uiScale, paddingBottom: 10 * uiScale }]}>
+            <Text style={[styles.hudTimecode, { fontSize: 11 * uiScale }]}>{timecodeStr}</Text>
+            <View style={styles.hudZoomTrack}>
+              <Text style={[styles.hudZoomLabel, { fontSize: 9 * uiScale }]}>W</Text>
+              <View style={[styles.hudZoomLine, { width: 34 * uiScale }]}>
+                <View style={[styles.hudZoomIndicator, { left: 14 * uiScale }]} />
+              </View>
+              <Text style={[styles.hudZoomLabel, { fontSize: 9 * uiScale }]}>T</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* ── 2. Digicam Mode HUD ── */}
+      {isDigital && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={[styles.hudTopBar, { paddingHorizontal: 12 * uiScale, paddingTop: 10 * uiScale }]}>
+            <Text style={[styles.hudDigitalAuto, { fontSize: 11 * uiScale }]}>[+] AUTO</Text>
+            <Text style={[styles.hudDigitalQuality, { fontSize: 10 * uiScale }]}>HQ 3.2M</Text>
+            <View style={styles.hudBatteryRow}>
+              <View style={[styles.hudDigitalBatteryBox, { width: 20 * uiScale, height: 10 * uiScale }]}>
+                <View style={[styles.hudDigitalBatteryFill, { width: 12 * uiScale }]} />
+              </View>
+              <View style={[styles.hudDigitalBatteryNub, { width: 2 * uiScale, height: 4 * uiScale }]} />
+            </View>
+          </View>
+          <View style={styles.hudDigitalCenterBox}>
+            <View style={[styles.hudDigitalAfTarget, { width: 36 * uiScale, height: 36 * uiScale }]} />
+          </View>
+          <View style={[styles.hudBottomBar, { paddingHorizontal: 12 * uiScale, paddingBottom: 10 * uiScale }]}>
+            <Text style={[styles.hudDigitalIso, { fontSize: 11 * uiScale }]}>ISO 400</Text>
+            <Text style={[styles.hudDigitalStorage, { fontSize: 10 * uiScale }]}>[ 128MB ]</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── 3. 35mm / Disposable Mode HUD ── */}
+      {isAnalog35mm && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={[styles.hudTopBar, { paddingHorizontal: 12 * uiScale, paddingTop: 10 * uiScale }]}>
+            <View style={[styles.hudReadyBadge, { paddingHorizontal: 8 * uiScale, paddingVertical: 3 * uiScale, borderRadius: 10 * uiScale }]}>
+              <View style={[styles.hudReadyLed, { width: 7 * uiScale, height: 7 * uiScale, borderRadius: 3.5 * uiScale }]} />
+              <Text style={[styles.hudReadyText, { fontSize: 9 * uiScale }]}>READY</Text>
+            </View>
+            <View style={[styles.hudFrameCounterBadge, { paddingHorizontal: 9 * uiScale, paddingVertical: 3 * uiScale, borderRadius: 12 * uiScale }]}>
+              <Text style={[styles.hudFrameCounterText, { fontSize: 11 * uiScale }]}>[ 24 ]</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* ── 4. Half-Frame Mode HUD ── */}
+      {isHalfFrame && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={styles.hudHalfFrameSplitLine} />
+          <View style={[styles.hudTopBar, { paddingHorizontal: 10 * uiScale, paddingTop: 8 * uiScale }]}>
+            <View style={[styles.hudHalfFrameBadge, { paddingHorizontal: 6 * uiScale, paddingVertical: 2 * uiScale }]}>
+              <Text style={[styles.hudHalfFrameBadgeText, { fontSize: 9 * uiScale }]}>FRAME 1</Text>
+            </View>
+            <View style={[styles.hudHalfFrameBadge, { paddingHorizontal: 6 * uiScale, paddingVertical: 2 * uiScale }]}>
+              <Text style={[styles.hudHalfFrameBadgeText, { fontSize: 9 * uiScale }]}>FRAME 2</Text>
+            </View>
+          </View>
+          <View style={styles.hudHalfFrameCenterMarker}>
+            <View style={[styles.hudHalfFrameCenterDot, { width: 6 * uiScale, height: 6 * uiScale, borderRadius: 3 * uiScale }]} />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function CameraScreen() {
   const { t } = useTranslation();
@@ -53,6 +196,8 @@ export default function CameraScreen() {
   
   const [isDoubleExposureMode, setIsDoubleExposureMode] = useState(false);
   const [doubleExposureFirstPhoto, setDoubleExposureFirstPhoto] = useState<string | null>(null);
+  const [selectedLens, setSelectedLens] = useState<LensType>('prime');
+  const [showLensPicker, setShowLensPicker] = useState(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -74,6 +219,25 @@ export default function CameraScreen() {
   // Preset name fade animation
   const nameOpacity = useRef(new Animated.Value(1)).current;
   const nameTranslateY = useRef(new Animated.Value(0)).current;
+
+  // Mechanical shutter flash animation ref (Requirement R6)
+  const shutterFlashOpacity = useRef(new Animated.Value(0)).current;
+
+  const triggerShutterFlash = useCallback(() => {
+    shutterFlashOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(shutterFlashOpacity, {
+        toValue: 1,
+        duration: 35,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shutterFlashOpacity, {
+        toValue: 0,
+        duration: 105,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [shutterFlashOpacity]);
 
   const dailyCamera = useMemo(() => {
     const today = new Date().getDay();
@@ -139,7 +303,12 @@ export default function CameraScreen() {
   const handleCapture = useCallback(async () => {
     if (isCapturing || !cameraRef.current) return;
     setIsCapturing(true);
+
+    // Tactile mechanical shutter flash feedback & acoustic feedback (Requirement R6 + Audio)
+    triggerShutterFlash();
+    playMechanicalShutterSound(selectedPreset.cameraType);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
       if (photo && isMounted.current) {
@@ -152,13 +321,24 @@ export default function CameraScreen() {
             setDoubleExposureFirstPhoto(null);
             router.push({
               pathname: '/preview',
-              params: { uri: photo.uri, secondaryUri: firstPhoto, presetId: selectedPreset.id },
+              params: {
+                uri: photo.uri,
+                secondaryUri: firstPhoto,
+                presetId: selectedPreset.id,
+                aspectRatio,
+                lens: selectedLens,
+              },
             });
           }
         } else {
           router.push({
             pathname: '/preview',
-            params: { uri: photo.uri, presetId: selectedPreset.id },
+            params: {
+              uri: photo.uri,
+              presetId: selectedPreset.id,
+              aspectRatio,
+              lens: selectedLens,
+            },
           });
         }
       }
@@ -167,7 +347,7 @@ export default function CameraScreen() {
     } finally {
       if (isMounted.current) setIsCapturing(false);
     }
-  }, [isCapturing, selectedPreset, isDoubleExposureMode, doubleExposureFirstPhoto]);
+  }, [isCapturing, selectedPreset, isDoubleExposureMode, doubleExposureFirstPhoto, aspectRatio, selectedLens, triggerShutterFlash]);
 
   const handleGalleryImport = useCallback(async () => {
     try {
@@ -185,14 +365,20 @@ export default function CameraScreen() {
         } else {
           router.push({
             pathname: '/preview',
-            params: { uri: asset.uri, presetId: selectedPreset.id, isImport: 'true' },
+            params: {
+              uri: asset.uri,
+              presetId: selectedPreset.id,
+              aspectRatio,
+              isImport: 'true',
+              lens: selectedLens,
+            },
           });
         }
       }
     } catch (error) {
       console.error('Gallery import error:', error);
     }
-  }, [selectedPreset]);
+  }, [selectedPreset, aspectRatio, selectedLens]);
 
   const handleRandomCamera = useCallback(() => {
     if (!isPro) {
@@ -268,28 +454,49 @@ export default function CameraScreen() {
 
             {/* Preset overlays — matched to FilteredImage Skia rendering */}
             {selectedPreset.settings.tintOpacity > 0 && (
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity }]} pointerEvents="none" />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: selectedPreset.settings.tint, opacity: selectedPreset.settings.tintOpacity * 0.75 }]} pointerEvents="none" />
             )}
             {selectedPreset.settings.vignette > 0 && (
               <View style={[StyleSheet.absoluteFillObject, styles.vignetteOverlay, { opacity: selectedPreset.settings.vignette * 0.9 }]} pointerEvents="none" />
             )}
             {selectedPreset.settings.lightLeak > 0 && (
-              <View style={[StyleSheet.absoluteFillObject, styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.5 }]} pointerEvents="none" />
+              <View style={[StyleSheet.absoluteFillObject, styles.lightLeakOverlay, { opacity: selectedPreset.settings.lightLeak * 0.4 }]} pointerEvents="none" />
             )}
             {selectedPreset.settings.grain > 0 && (
-              <View style={[StyleSheet.absoluteFillObject, styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.55 }]} pointerEvents="none" />
+              <View style={[StyleSheet.absoluteFillObject, styles.grainOverlay, { opacity: selectedPreset.settings.grain * 0.4 }]} pointerEvents="none" />
             )}
             {selectedPreset.settings.rgbShift > 0 && (
               <View style={[StyleSheet.absoluteFillObject]} pointerEvents="none">
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,0,0,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: selectedPreset.settings.rgbShift * 8 }] }]} />
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,255,0.12)', opacity: selectedPreset.settings.rgbShift, transform: [{ translateX: -selectedPreset.settings.rgbShift * 8 }] }]} />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,100,50,0.06)', opacity: selectedPreset.settings.rgbShift * 0.5, transform: [{ translateX: selectedPreset.settings.rgbShift * 4 }] }]} />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(50,150,255,0.06)', opacity: selectedPreset.settings.rgbShift * 0.5, transform: [{ translateX: -selectedPreset.settings.rgbShift * 4 }] }]} />
               </View>
             )}
             {selectedPreset.settings.halation > 0 && (
-              <View style={[StyleSheet.absoluteFillObject, styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.45 }]} pointerEvents="none" />
+              <View style={[StyleSheet.absoluteFillObject, styles.halationOverlay, { opacity: selectedPreset.settings.halation * 0.35 }]} pointerEvents="none" />
             )}
             {selectedPreset.settings.flash > 0 && (
-              <View style={[StyleSheet.absoluteFillObject, styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.35 }]} pointerEvents="none" />
+              <View style={[StyleSheet.absoluteFillObject, styles.flashOverlay, { opacity: selectedPreset.settings.flash * 0.25 }]} pointerEvents="none" />
+            )}
+
+            {/* Live VHS CRT Scanlines Simulation */}
+            {(selectedPreset.frameType === 'vhs' || selectedPreset.cameraType === 'vhs' || selectedPreset.cameraType === 'camcorder') && (
+              <View style={[StyleSheet.absoluteFillObject, styles.liveVhsOverlay]} pointerEvents="none">
+                <View style={styles.liveVhsTrackingBar} />
+              </View>
+            )}
+
+            {/* Live Fisheye Lens Barrel Vignette */}
+            {(selectedLens === 'fisheye' || selectedPreset.frameType === 'fisheye') && (
+              <View style={[StyleSheet.absoluteFillObject, styles.liveFisheyeOverlay]} pointerEvents="none" />
+            )}
+
+            {/* Active Lens Indicator in Viewfinder */}
+            {selectedLens !== 'prime' && (
+              <View style={styles.viewfinderLensBadge} pointerEvents="none">
+                <Text style={[styles.viewfinderLensText, { fontSize: 9 * uiScale }]}>
+                  {selectedLens.toUpperCase()} LENS
+                </Text>
+              </View>
             )}
 
             {/* Focus Brackets & Grid Lines */}
@@ -308,11 +515,24 @@ export default function CameraScreen() {
               </View>
             </View>
 
+            {/* Vintage Viewfinder HUD Overlays (Requirement R6) */}
+            <ViewfinderHud preset={selectedPreset} uiScale={uiScale} />
+
             {selectedPreset.settings.timestamp && (
               <Text style={styles.viewfinderTimestamp} pointerEvents="none">
                 {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
               </Text>
             )}
+
+            {/* Mechanical Shutter Flash Feedback Overlay (Requirement R6) */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.shutterFlashOverlay,
+                { opacity: shutterFlashOpacity },
+              ]}
+            />
 
             {/* Double Exposure Indicator Banner */}
             {doubleExposureFirstPhoto && (
@@ -353,6 +573,17 @@ export default function CameraScreen() {
             <View style={styles.controlsRow}>
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.controlBtn, selectedLens !== 'prime' && styles.controlBtnActive]}
+                onPress={() => {
+                  setShowLensPicker((v) => !v);
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale, color: selectedLens !== 'prime' ? '#FFB800' : '#FFF' }]}>
+                  {selectedLens === 'prime' ? 'LENS' : selectedLens.toUpperCase()}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.controlBtn, isDoubleExposureMode && styles.controlBtnActive]} onPress={() => {
                 setIsDoubleExposureMode(!isDoubleExposureMode);
@@ -455,6 +686,56 @@ export default function CameraScreen() {
           </View>
         )}
 
+        {/* Lens selection panel (Interchangeable Lenses Menu) */}
+        {showLensPicker && (
+          <View style={styles.lensPickerPanel}>
+            <View style={styles.lensPickerHeader}>
+              <Text style={[styles.lensPickerTitle, { fontSize: 11 * uiScale }]}>OPTICAL LENSES</Text>
+              <TouchableOpacity
+                onPress={() => setShowLensPicker(false)}
+                style={styles.lensPickerClose}
+              >
+                <Text style={[styles.lensPickerCloseText, { fontSize: 10 * uiScale }]}>DONE</Text>
+              </TouchableOpacity>
+            </View>
+            <GHScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ width: '100%' }}
+              contentContainerStyle={styles.lensList}
+            >
+              {CAMERA_LENSES.map((lensItem) => {
+                const isSelected = selectedLens === lensItem.id;
+                const lensIcon = lensItem.id === 'prime' ? '⭕' : lensItem.id === 'fisheye' ? '🐟' : lensItem.id === 'prism' ? '💎' : lensItem.id === 'star' ? '✨' : '🔭';
+                return (
+                  <TouchableOpacity
+                    key={lensItem.id}
+                    style={[
+                      styles.lensCard,
+                      isSelected && styles.lensCardActive,
+                      { paddingHorizontal: 12 * uiScale, paddingVertical: 8 * uiScale }
+                    ]}
+                    onPress={() => {
+                      setSelectedLens(lensItem.id);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }}
+                  >
+                    <View style={styles.lensCardHeader}>
+                      <Text style={[styles.lensIcon, { fontSize: 14 * uiScale }]}>{lensIcon}</Text>
+                      <Text style={[styles.lensName, { fontSize: 11 * uiScale }, isSelected && styles.lensNameActive]}>
+                        {lensItem.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.lensTagline, { fontSize: 9 * uiScale }]}>
+                      {lensItem.tagline}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </GHScrollView>
+          </View>
+        )}
+
         {/* Camera carousel */}
         <CameraCarousel
           presets={filteredPresets}
@@ -471,7 +752,10 @@ export default function CameraScreen() {
               <ImageIcon size={22 * uiScale} color="#FFFFFF" />
               <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }]}>{t('common.import')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sideButton} onPress={() => router.push('/video')}>
+            <TouchableOpacity
+              style={styles.sideButton}
+              onPress={() => router.push({ pathname: '/video', params: { presetId: selectedPreset.id } })}
+            >
               <Video size={22 * uiScale} color="#FFFFFF" />
               <Text style={[styles.sideLabel, { fontSize: 10 * uiScale }]}>{t('common.video')}</Text>
             </TouchableOpacity>
@@ -548,6 +832,42 @@ const styles = StyleSheet.create({
   },
   flashOverlay: {
     backgroundColor: 'rgba(255,255,240,0.25)',
+  },
+  liveVhsOverlay: {
+    borderBottomWidth: 4,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  liveVhsTrackingBar: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  liveFisheyeOverlay: {
+    borderRadius: 999,
+    borderWidth: 24,
+    borderColor: 'rgba(0,0,0,0.75)',
+    margin: -10,
+  },
+  viewfinderLensBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#E8A838',
+  },
+  viewfinderLensText: {
+    color: '#E8A838',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   timestamp: {
     position: 'absolute',
@@ -851,5 +1171,299 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderRadius: 6,
     padding: 1,
+  },
+
+  // ── Shutter Flash Overlay (Requirement R6) ──
+  shutterFlashOverlay: {
+    backgroundColor: '#FFFFFF',
+    zIndex: 50,
+  },
+
+  // ── Vintage HUD Overlays (Requirement R6) ──
+  hudTopBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hudBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  // Camcorder
+  hudRecRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hudRecDot: {
+    backgroundColor: '#FF3B30',
+  },
+  hudRecText: {
+    color: '#FF3B30',
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  hudCamcorderFormat: {
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '700',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  hudBatteryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hudBatteryBox: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 1.5,
+    gap: 1.5,
+  },
+  hudBatterySegment: {
+    backgroundColor: '#4CD964',
+    borderRadius: 0.5,
+  },
+  hudBatteryNub: {
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderTopRightRadius: 1,
+    borderBottomRightRadius: 1,
+    marginLeft: 1,
+  },
+  hudTimecode: {
+    color: 'rgba(255,255,255,0.85)',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  hudZoomTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hudZoomLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+  },
+  hudZoomLine: {
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  hudZoomIndicator: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFF',
+    top: -2,
+  },
+  // Digicam
+  hudDigitalAuto: {
+    color: '#00FF66',
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  hudDigitalQuality: {
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '600',
+  },
+  hudDigitalBatteryBox: {
+    borderWidth: 1.2,
+    borderColor: '#00FF66',
+    borderRadius: 2,
+    padding: 1,
+    justifyContent: 'center',
+  },
+  hudDigitalBatteryFill: {
+    height: '100%',
+    backgroundColor: '#00FF66',
+    borderRadius: 1,
+  },
+  hudDigitalBatteryNub: {
+    backgroundColor: '#00FF66',
+    borderTopRightRadius: 1,
+    borderBottomRightRadius: 1,
+    marginLeft: 1,
+  },
+  hudDigitalCenterBox: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hudDigitalAfTarget: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,102,0.4)',
+    borderRadius: 4,
+  },
+  hudDigitalIso: {
+    color: '#00FF66',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  hudDigitalStorage: {
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  // 35mm / Disposable
+  hudReadyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  hudReadyLed: {
+    backgroundColor: '#34C759',
+    shadowColor: '#34C759',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 5,
+  },
+  hudReadyText: {
+    color: '#34C759',
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  hudFrameCounterBadge: {
+    backgroundColor: '#1C1C1E',
+    borderWidth: 1.5,
+    borderColor: '#3A3A3C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+  },
+  hudFrameCounterText: {
+    color: '#FFB800',
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 0.5,
+  },
+  // Half-frame
+  hudHalfFrameSplitLine: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 1.5,
+    marginLeft: -0.75,
+    backgroundColor: 'rgba(255,184,0,0.5)',
+  },
+  hudHalfFrameBadge: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.3)',
+  },
+  hudHalfFrameBadgeText: {
+    color: '#FFB800',
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  hudHalfFrameCenterMarker: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hudHalfFrameCenterDot: {
+    backgroundColor: '#FFB800',
+    opacity: 0.7,
+  },
+  // Lens Picker
+  lensPickerPanel: {
+    backgroundColor: '#161618',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#2A2A2C',
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  lensPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  lensPickerTitle: {
+    color: '#8E8E93',
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  lensPickerClose: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 4,
+  },
+  lensPickerCloseText: {
+    color: '#FFB800',
+    fontWeight: '700',
+  },
+  lensList: {
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  lensCard: {
+    backgroundColor: '#202022',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2E2E32',
+    minWidth: 110,
+  },
+  lensCardActive: {
+    borderColor: '#FFB800',
+    backgroundColor: '#2A2415',
+  },
+  lensCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  lensIcon: {},
+  lensName: {
+    color: '#E5E5EA',
+    fontWeight: '700',
+  },
+  lensNameActive: {
+    color: '#FFB800',
+  },
+  lensTagline: {
+    color: '#8E8E93',
   },
 });

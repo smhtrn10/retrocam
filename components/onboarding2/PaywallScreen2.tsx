@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Animated,
   Dimensions, ScrollView, ActivityIndicator, Alert, Linking,
 } from 'react-native';
-import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Haptics from 'expo-haptics';
@@ -59,16 +58,17 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
   }, [isPro, onClose]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowCloseButton(true), 5000);
+    const timer = setTimeout(() => setShowCloseButton(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (packages.length > 0 && !selectedPackage) {
-      const weekly = packages.find(p => p.packageType === 'WEEKLY');
-      const monthly = packages.find(p => p.packageType === 'MONTHLY');
-      const annual = packages.find(p => p.packageType === 'ANNUAL');
-      setSelectedPackage(weekly?.identifier || monthly?.identifier || annual?.identifier || packages[0].identifier);
+    const isCurrentValid = selectedPackage && packages.some(p => p.identifier === selectedPackage);
+    if (packages.length > 0 && !isCurrentValid) {
+      const annual = packages.find(p => p.packageType === 'ANNUAL' || p.identifier.toLowerCase().includes('annual') || p.identifier.toLowerCase().includes('year'));
+      const monthly = packages.find(p => p.packageType === 'MONTHLY' || p.identifier.toLowerCase().includes('month'));
+      const weekly = packages.find(p => p.packageType === 'WEEKLY' || p.identifier.toLowerCase().includes('week'));
+      setSelectedPackage(annual?.identifier || monthly?.identifier || weekly?.identifier || packages[0].identifier);
     }
   }, [packages, selectedPackage]);
 
@@ -131,7 +131,21 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
   }, [restorePurchases]);
 
   const selectedPkg = packages.find(p => p.identifier === selectedPackage);
-  const isAnnualSelected = selectedPkg?.packageType === 'ANNUAL';
+  const isAnnualSelected = Boolean(
+    selectedPkg && (
+      selectedPkg.packageType === 'ANNUAL' ||
+      selectedPkg.identifier.toLowerCase().includes('annual') ||
+      selectedPkg.identifier.toLowerCase().includes('year') ||
+      selectedPkg.product?.subscriptionPeriod === 'P1Y'
+    )
+  );
+
+  const getButtonLabel = () => {
+    if (isAnnualSelected && selectedPkg) {
+      return t('paywall.trial_btn', 'Start Free Trial');
+    }
+    return t('paywall.continue_btn', 'Continue');
+  };
 
   return (
     <LinearGradient colors={['#050510', '#0a0a0a', '#1A1410']} style={styles.container}>
@@ -191,7 +205,11 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
             ) : (
               packages.map(pkg => {
                 const isSelected = selectedPackage === pkg.identifier;
-                const isYearly = pkg.packageType === 'ANNUAL';
+                const isYearly =
+                  pkg.packageType === 'ANNUAL' ||
+                  pkg.identifier.toLowerCase().includes('annual') ||
+                  pkg.identifier.toLowerCase().includes('year') ||
+                  pkg.product?.subscriptionPeriod === 'P1Y';
                 const price = pkg.product.priceString;
 
                 let planLabel = t('paywall.monthly', 'Monthly');
@@ -199,7 +217,7 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
                 if (isYearly) {
                   planLabel = t('paywall.yearly', 'Yearly');
                   planSub = t('paywall.yearly_sub', 'Billed yearly');
-                } else if (pkg.packageType === 'WEEKLY') {
+                } else if (pkg.packageType === 'WEEKLY' || pkg.identifier.toLowerCase().includes('week')) {
                   planLabel = t('paywall.weekly', 'Weekly');
                   planSub = t('paywall.weekly_sub', 'Billed weekly');
                 }
@@ -258,7 +276,7 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
                 <ActivityIndicator color="#000" />
               ) : (
                 <Text style={styles.ctaText}>
-                  {t('paywall.trial_btn', 'Start Free Trial')} 🚀
+                  {getButtonLabel()} 🚀
                 </Text>
               )}
             </LinearGradient>
@@ -266,11 +284,11 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
 
           {selectedPkg && (
             <Text style={styles.trialNote}>
-              {selectedPkg.packageType === 'ANNUAL'
+              {isAnnualSelected
                 ? t('paywall.trial_disclaimer_yearly', '3-day free trial, then {{price}}/year. Cancel anytime.', { price: selectedPkg.product.priceString })
-                : selectedPkg.packageType === 'MONTHLY'
-                  ? t('paywall.trial_disclaimer_monthly', '3-day free trial, then {{price}}/month. Cancel anytime.', { price: selectedPkg.product.priceString })
-                  : t('paywall.trial_disclaimer_weekly', '3-day free trial, then {{price}}/week. Cancel anytime.', { price: selectedPkg.product.priceString })
+                : (selectedPkg.packageType === 'MONTHLY' || selectedPkg.identifier.toLowerCase().includes('month'))
+                  ? t('paywall.monthly_sub', 'Billed monthly. Cancel anytime.')
+                  : t('paywall.weekly_sub', 'Billed weekly. Cancel anytime.')
               }
             </Text>
           )}

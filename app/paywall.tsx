@@ -54,16 +54,17 @@ export default function PaywallScreen() {
   }, [isPro]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowCloseButton(true), 7000);
+    const timer = setTimeout(() => setShowCloseButton(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (packages.length > 0 && !selectedPackage) {
-      const weekly = packages.find(p => p.packageType === 'WEEKLY');
-      const monthly = packages.find(p => p.packageType === 'MONTHLY');
-      const annual = packages.find(p => p.packageType === 'ANNUAL');
-      setSelectedPackage(weekly?.identifier || monthly?.identifier || annual?.identifier || packages[0].identifier);
+    const isCurrentValid = selectedPackage && packages.some(p => p.identifier === selectedPackage);
+    if (packages.length > 0 && !isCurrentValid) {
+      const annual = packages.find(p => p.packageType === 'ANNUAL' || p.identifier.toLowerCase().includes('annual') || p.identifier.toLowerCase().includes('year'));
+      const monthly = packages.find(p => p.packageType === 'MONTHLY' || p.identifier.toLowerCase().includes('month'));
+      const weekly = packages.find(p => p.packageType === 'WEEKLY' || p.identifier.toLowerCase().includes('week'));
+      setSelectedPackage(annual?.identifier || monthly?.identifier || weekly?.identifier || packages[0].identifier);
     }
   }, [packages, selectedPackage]);
 
@@ -130,7 +131,14 @@ export default function PaywallScreen() {
   }, [restorePurchases]);
 
   const selectedPkg = packages.find(p => p.identifier === selectedPackage);
-  const isAnnualSelected = selectedPkg?.packageType === 'ANNUAL';
+  const isAnnualSelected = Boolean(
+    selectedPkg && (
+      selectedPkg.packageType === 'ANNUAL' ||
+      selectedPkg.identifier.toLowerCase().includes('annual') ||
+      selectedPkg.identifier.toLowerCase().includes('year') ||
+      selectedPkg.product?.subscriptionPeriod === 'P1Y'
+    )
+  );
 
   const getButtonLabel = () => {
     if (isAnnualSelected && selectedPkg) {
@@ -153,7 +161,10 @@ export default function PaywallScreen() {
         {/* CLOSE */}
         <View style={styles.headerRow}>
           {showCloseButton ? (
-            <TouchableOpacity onPress={() => router.replace('/')} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+              style={styles.closeBtn}
+            >
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           ) : <View style={styles.closeBtnPlaceholder} />}
@@ -208,7 +219,11 @@ export default function PaywallScreen() {
           ) : (
             packages.map((pkg) => {
               const isSelected = selectedPackage === pkg.identifier;
-              const isYearly = pkg.packageType === 'ANNUAL';
+              const isYearly =
+                pkg.packageType === 'ANNUAL' ||
+                pkg.identifier.toLowerCase().includes('annual') ||
+                pkg.identifier.toLowerCase().includes('year') ||
+                pkg.product?.subscriptionPeriod === 'P1Y';
               const price = pkg.product.priceString;
 
               let planLabel = t('paywall.monthly', 'Monthly');
@@ -217,7 +232,7 @@ export default function PaywallScreen() {
               if (isYearly) {
                 planLabel = t('paywall.yearly', 'Yearly');
                 planSub = t('paywall.yearly_sub', 'Billed yearly');
-              } else if (pkg.packageType === 'WEEKLY') {
+              } else if (pkg.packageType === 'WEEKLY' || pkg.identifier.toLowerCase().includes('week')) {
                 planLabel = t('paywall.weekly', 'Weekly');
                 planSub = t('paywall.weekly_sub', 'Billed weekly');
               }

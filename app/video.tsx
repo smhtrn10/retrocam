@@ -9,21 +9,21 @@ import {
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { X, Video, Square, Aperture, Zap } from 'lucide-react-native';
 import { CAMERA_PRESETS, CameraPreset } from '@/constants/presets';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
+import { VideoEffectMode } from '@/utils/videoFilter';
 
 // Show all presets in video screen, default to free vhs-glitch
 const VIDEO_PRESETS = CAMERA_PRESETS;
 const DEFAULT_VIDEO_PRESET = CAMERA_PRESETS.find(p => p.id === 'vhs-glitch') ?? CAMERA_PRESETS[0];
 
-type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
-
- export default function VideoScreen() {
+export default function VideoScreen() {
+  const { presetId } = useLocalSearchParams<{ presetId?: string }>();
   const { t } = useTranslation();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, isTablet, scale: uiScale } = useDevice();
   const [camPermission, requestCamPermission] = useCameraPermissions();
@@ -51,14 +51,15 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
     }, [])
   );
   const [facing, setFacing] = useState<'front' | 'back'>('back');
-  const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(DEFAULT_VIDEO_PRESET);
-  const [effect, setEffect] = useState<VideoEffect>('none');
+  const initialPreset = CAMERA_PRESETS.find((p) => p.id === presetId) ?? DEFAULT_VIDEO_PRESET;
+  const [selectedPreset, setSelectedPreset] = useState<CameraPreset>(initialPreset);
+  const [effect, setEffect] = useState<VideoEffectMode>('none');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { isPro, showPaywall } = usePurchases();
 
-  const effectLabel: Record<VideoEffect, string> = {
+  const effectLabel: Record<VideoEffectMode, string> = {
     none: 'Clean',
     vhs: 'VHS',
     glitch: 'Glitch',
@@ -66,7 +67,7 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
   };
 
   const cycleEffect = useCallback(() => {
-    const effects: VideoEffect[] = ['none', 'vhs', 'glitch', 'rgb'];
+    const effects: VideoEffectMode[] = ['none', 'vhs', 'glitch', 'rgb'];
     setEffect((prev) => {
       const idx = effects.indexOf(prev);
       return effects[(idx + 1) % effects.length];
@@ -83,8 +84,14 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
       return;
     }
 
-    if (!camPermission?.granted) { await requestCamPermission(); return; }
-    if (!micPermission?.granted) { await requestMicPermission(); return; }
+    if (!camPermission?.granted) {
+      const camRes = await requestCamPermission();
+      if (!camRes.granted) return;
+    }
+    if (!micPermission?.granted) {
+      const micRes = await requestMicPermission();
+      if (!micRes.granted) return;
+    }
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsRecording(true);
@@ -106,7 +113,11 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         if (video?.uri) {
           router.push({
             pathname: '/video-preview' as any,
-            params: { uri: encodeURIComponent(video.uri), presetId: selectedPreset.id },
+            params: {
+              uri: encodeURIComponent(video.uri),
+              presetId: selectedPreset.id,
+              videoEffect: effect,
+            },
           });
         }
       }
@@ -118,7 +129,7 @@ type VideoEffect = 'none' | 'vhs' | 'glitch' | 'rgb';
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       }
     }
-  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission, selectedPreset, isPro, showPaywall]);
+  }, [isRecording, camPermission, micPermission, requestCamPermission, requestMicPermission, selectedPreset, isPro, showPaywall, effect]);
 
   const stopRecording = useCallback(() => {
     if (!cameraRef.current || !isRecording) return;
