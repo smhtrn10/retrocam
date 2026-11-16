@@ -554,3 +554,7 @@ export const CAMERA_TYPE_ICONS: Record<CameraType, string> = {
   'vhs':         '📼',
   'special':     '✨',
 };
+
+export function isPresetLocked(preset: CameraPreset, isPro: boolean): boolean {
+  return preset.isPro && !isPro;
+}
