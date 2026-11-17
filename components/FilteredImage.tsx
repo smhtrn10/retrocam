@@ -1434,20 +1434,20 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
               height: curH,
             });
 
-            // Tier 1: GPU-backed offscreen surface
+            // Tier 1: GPU-backed offscreen surface at target dimension
             let surface: SkSurface | null = null;
             try {
-              surface = Skia.Surface.MakeOffscreen(exportW, exportH);
+              surface = Skia.Surface.MakeOffscreen(curW, curH);
             } catch (gpuErr) {
-              console.warn('Skia.Surface.MakeOffscreen failed:', gpuErr);
+              console.warn(`Skia.Surface.MakeOffscreen failed at ${curW}x${curH}:`, gpuErr);
             }
 
-            // Tier 2: CPU raster surface fallback
+            // Tier 2: CPU raster surface fallback at target dimension
             if (!surface) {
               try {
-                surface = Skia.Surface.Make(exportW, exportH);
+                surface = Skia.Surface.Make(curW, curH);
               } catch (cpuErr) {
-                console.warn('Skia.Surface.Make failed:', cpuErr);
+                console.warn(`Skia.Surface.Make failed at ${curW}x${curH}:`, cpuErr);
               }
             }
 

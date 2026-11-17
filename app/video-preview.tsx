@@ -135,13 +135,29 @@ export default function VideoPreviewScreen() {
 
   // Player initialization & hot-swap
   const player = useVideoPlayer(filteredUri || uri, (p) => {
-    p.loop = true;
-    p.play();
+    if (p) {
+      try {
+        p.loop = true;
+        if (typeof p.play === 'function') {
+          p.play();
+        }
+      } catch (err) {
+        console.warn('[RetroCam] Video player setup error:', err);
+      }
+    }
   });
 
   useEffect(() => {
     if (player && filteredUri && filteredUri !== uri) {
-      player.replace(filteredUri);
+      try {
+        if (typeof player.replace === 'function') {
+          player.replace(filteredUri);
+        } else if (typeof (player as any).replaceAsync === 'function') {
+          void (player as any).replaceAsync(filteredUri);
+        }
+      } catch (err) {
+        console.warn('[RetroCam] Video player replace error:', err);
+      }
     }
   }, [filteredUri]);
 

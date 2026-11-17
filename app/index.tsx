@@ -425,21 +425,29 @@ export default function CameraScreen() {
             const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
             touchStartDistRef.current = dist;
             touchStartZoomRef.current = zoomRef.current;
+          } else {
+            touchStartDistRef.current = null;
           }
         },
         onPanResponderMove: (evt) => {
-          if (
-            evt.nativeEvent.touches.length === 2 &&
-            touchStartDistRef.current &&
-            touchStartDistRef.current > 0
-          ) {
+          if (evt.nativeEvent.touches.length === 2) {
             const t1 = evt.nativeEvent.touches[0];
             const t2 = evt.nativeEvent.touches[1];
             const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
+
+            // Dynamically initialize distance if two fingers touched down asynchronously
+            if (!touchStartDistRef.current || touchStartDistRef.current <= 0) {
+              touchStartDistRef.current = dist;
+              touchStartZoomRef.current = zoomRef.current;
+              return;
+            }
+
             const factor = dist / touchStartDistRef.current;
-            const delta = (factor - 1) * 0.6;
+            const delta = (factor - 1) * 0.75;
             const newZoom = Math.min(1.0, Math.max(0.0, touchStartZoomRef.current + delta));
             setZoom(Number(newZoom.toFixed(3)));
+          } else {
+            touchStartDistRef.current = null;
           }
         },
         onPanResponderRelease: (evt, gestureState) => {
@@ -453,6 +461,9 @@ export default function CameraScreen() {
             handleViewfinderTap(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
           }
         },
+        onPanResponderTerminate: () => {
+          touchStartDistRef.current = null;
+        },
       }),
     [handleViewfinderTap]
   );
@@ -462,7 +473,7 @@ export default function CameraScreen() {
   const handleCapture = useCallback(async (skipTimer = false) => {
     if (isCapturing || !cameraRef.current) return;
 
-    if (countdown !== null) {
+    if (countdown !== null && !skipTimer) {
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
       setCountdown(null);
@@ -500,7 +511,7 @@ export default function CameraScreen() {
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
+        quality: 0.95,
         skipProcessing: false,
         shutterSound: !isMuted,
       });
