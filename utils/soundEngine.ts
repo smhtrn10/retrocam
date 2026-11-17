@@ -27,6 +27,11 @@ function playWav(source: any, volume = 1.0) {
   }
 }
 
+export function playTimerTickSound() {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  playWav(SOUND_ASSETS.disposable, 0.4);
+}
+
 export function playMechanicalShutterSound(cameraType?: string) {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 

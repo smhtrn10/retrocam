@@ -130,6 +130,7 @@ export default function PreviewScreen() {
   const { isPro, showPaywall } = usePurchases();
   const [isEditing, setIsEditing] = useState(false);
   const [overrides, setOverrides] = useState<Partial<CameraPreset['settings']>>({});
+  const [filterOpacity, setFilterOpacity] = useState<number>(1.0);
   const filteredImageRef = useRef<FilteredImageRef>(null);
   const isMounted = useRef(true);
 
@@ -309,6 +310,7 @@ export default function PreviewScreen() {
             showWatermark={showWatermark}
             overrides={overrides}
             lens={selectedLens}
+            filterOpacity={filterOpacity}
           />
         )}
         <View style={styles.modeLabel}>
@@ -481,13 +483,31 @@ export default function PreviewScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => { setOverrides({}); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  onPress={() => {
+                    setOverrides({});
+                    setFilterOpacity(1.0);
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
                   style={styles.resetBtn}
                 >
                   <RotateCcw size={14 * uiScale} color="#888" />
                   <Text style={[styles.resetText, { fontSize: 12 * uiScale }]}>Reset</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* Master Filter Opacity Slider */}
+            <View style={styles.sliderRow}>
+              <Text style={[styles.sliderLabel, { fontSize: 10 * uiScale, width: 72 * uiScale, color: '#E8A838', fontWeight: '700' }]}>OPACITY</Text>
+              <Slider
+                value={filterOpacity}
+                min={0}
+                max={1}
+                onChange={(v) => setFilterOpacity(parseFloat(v.toFixed(2)))}
+              />
+              <Text style={[styles.sliderValue, { fontSize: 10 * uiScale, width: 28 * uiScale, color: '#E8A838' }]}>
+                {Math.round(filterOpacity * 100)}%
+              </Text>
             </View>
 
             {EDIT_PARAMS.map(({ key, label, min, max }) => (

@@ -305,8 +305,9 @@ export function buildFFmpegArgs(
 
   return [
     ...baseArgs,
-    '-c:v', 'mpeg4',
-    '-q:v', '5',
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '23',
     '-pix_fmt', 'yuv420p',
     '-map', '0:v:0',
     '-map', '0:a:0?',

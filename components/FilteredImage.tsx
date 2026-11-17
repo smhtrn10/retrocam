@@ -48,6 +48,206 @@ export interface FilteredImageProps {
   overrides?: Partial<CameraPreset['settings']>;
   aspectRatio?: AspectRatioType;
   lens?: LensType;
+  filterOpacity?: number;
+}
+
+export interface LuminancePeak {
+  x: number; // 0..1 normalized
+  y: number; // 0..1 normalized
+  luminance: number; // 0..1
+}
+
+/**
+ * Dynamically detects luminance peaks in an image by downsampling to a 32x32 surface,
+ * calculating Rec. 709 luminance ($0.2126R + 0.7152G + 0.0722B$), finding highlight
+ * centroid for halation, and local maxima for specular star flares.
+ */
+export function detectLuminancePeaks(
+  image: SkImage | null,
+  gridSize = 32,
+  threshold = 0.68
+): { halationCenter: LuminancePeak; specularPeaks: LuminancePeak[] } {
+  const defaultCenter: LuminancePeak = { x: 0.5, y: 0.28, luminance: 0.5 };
+  const defaultPeaks: LuminancePeak[] = [
+    { x: 0.5, y: 0.30, luminance: 0.8 },
+    { x: 0.7, y: 0.22, luminance: 0.7 },
+  ];
+
+  if (!image) {
+    return { halationCenter: defaultCenter, specularPeaks: defaultPeaks };
+  }
+
+  try {
+    const surf = Skia.Surface.Make(gridSize, gridSize);
+    if (!surf) return { halationCenter: defaultCenter, specularPeaks: defaultPeaks };
+
+    const canvas = surf.getCanvas();
+    const paint = Skia.Paint();
+    canvas.drawImageRect(
+      image,
+      Skia.XYWHRect(0, 0, image.width(), image.height()),
+      Skia.XYWHRect(0, 0, gridSize, gridSize),
+      paint
+    );
+    surf.flush();
+    const snap = surf.makeImageSnapshot();
+    const pixels = snap.readPixels();
+    if (!pixels || pixels.length < gridSize * gridSize * 4) {
+      return { halationCenter: defaultCenter, specularPeaks: defaultPeaks };
+    }
+
+    let sumX = 0;
+    let sumY = 0;
+    let sumWeight = 0;
+    let maxLum = 0;
+    let bestX = 0.5;
+    let bestY = 0.28;
+
+    const candidates: LuminancePeak[] = [];
+
+    for (let py = 0; py < gridSize; py++) {
+      for (let px = 0; px < gridSize; px++) {
+        const idx = (py * gridSize + px) * 4;
+        const rawR = pixels[idx] as number;
+        const rawG = pixels[idx + 1] as number;
+        const rawB = pixels[idx + 2] as number;
+        const r = rawR > 1.0 ? rawR / 255.0 : rawR;
+        const g = rawG > 1.0 ? rawG / 255.0 : rawG;
+        const b = rawB > 1.0 ? rawB / 255.0 : rawB;
+
+        // ITU-R BT.709 relative luminance
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        if (lum > maxLum) {
+          maxLum = lum;
+          bestX = (px + 0.5) / gridSize;
+          bestY = (py + 0.5) / gridSize;
+        }
+
+        if (lum >= threshold) {
+          const weight = lum - threshold;
+          sumX += ((px + 0.5) / gridSize) * weight;
+          sumY += ((py + 0.5) / gridSize) * weight;
+          sumWeight += weight;
+          candidates.push({ x: (px + 0.5) / gridSize, y: (py + 0.5) / gridSize, luminance: lum });
+        }
+      }
+    }
+
+    const halationCenter: LuminancePeak = sumWeight > 0.01
+      ? { x: sumX / sumWeight, y: sumY / sumWeight, luminance: maxLum }
+      : { x: bestX, y: bestY, luminance: maxLum };
+
+    // Sort specular candidates by luminance descending
+    candidates.sort((a, b) => b.luminance - a.luminance);
+    const specularPeaks: LuminancePeak[] = [];
+    for (const c of candidates) {
+      // Ensure specular stars don't overlap too closely
+      const isTooClose = specularPeaks.some(p => Math.hypot(p.x - c.x, p.y - c.y) < 0.18);
+      if (!isTooClose) {
+        specularPeaks.push(c);
+        if (specularPeaks.length >= 2) break;
+      }
+    }
+
+    while (specularPeaks.length < 2) {
+      specularPeaks.push(defaultPeaks[specularPeaks.length]);
+    }
+
+    return { halationCenter, specularPeaks };
+  } catch {
+    return { halationCenter: defaultCenter, specularPeaks: defaultPeaks };
+  }
+}
+
+/**
+ * Injects JPEG APP1 EXIF segment from original photo into Skia-exported JPEG base64 string.
+ */
+export async function injectExifFromOriginal(
+  exportedBase64: string,
+  originalUri: string
+): Promise<string> {
+  try {
+    if (!originalUri) return exportedBase64;
+
+    // Read the beginning of original photo where EXIF headers reside (up to 64KB)
+    let rawHead: string;
+    try {
+      rawHead = await FileSystem.readAsStringAsync(originalUri, {
+        encoding: FileSystem.EncodingType.Base64,
+        length: 65536,
+      });
+    } catch {
+      rawHead = await FileSystem.readAsStringAsync(originalUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    }
+
+    if (!rawHead) return exportedBase64;
+
+    const origBinary = atob(rawHead);
+    const origLen = origBinary.length;
+    const origBytes = new Uint8Array(origLen);
+    for (let i = 0; i < origLen; i++) {
+      origBytes[i] = origBinary.charCodeAt(i);
+    }
+
+    // Verify JPEG SOI (0xFF, 0xD8)
+    if (origBytes.length < 4 || origBytes[0] !== 0xFF || origBytes[1] !== 0xD8) {
+      return exportedBase64;
+    }
+
+    // Locate APP1 marker (0xFF, 0xE1) in original image
+    let app1Segment: Uint8Array | null = null;
+    let offset = 2;
+    while (offset < origBytes.length - 4) {
+      if (origBytes[offset] !== 0xFF) break;
+      const marker = origBytes[offset + 1];
+      if (marker === 0xD8 || marker === 0xD9 || marker === 0xDA) break;
+
+      const segLen = (origBytes[offset + 2] << 8) | origBytes[offset + 3];
+      if (segLen < 2) break;
+
+      if (marker === 0xE1) {
+        app1Segment = origBytes.slice(offset, offset + 2 + segLen);
+        break;
+      }
+      offset += 2 + segLen;
+    }
+
+    if (!app1Segment || app1Segment.length === 0) {
+      return exportedBase64;
+    }
+
+    const expBinary = atob(exportedBase64);
+    const expLen = expBinary.length;
+    const expBytes = new Uint8Array(expLen);
+    for (let i = 0; i < expLen; i++) {
+      expBytes[i] = expBinary.charCodeAt(i);
+    }
+
+    // Verify exported JPEG SOI
+    if (expBytes.length < 2 || expBytes[0] !== 0xFF || expBytes[1] !== 0xD8) {
+      return exportedBase64;
+    }
+
+    // Construct merged JPEG: SOI (2 bytes) + APP1 Segment + Rest of Exported JPEG
+    const merged = new Uint8Array(expBytes.length + app1Segment.length);
+    merged.set(expBytes.subarray(0, 2), 0);
+    merged.set(app1Segment, 2);
+    merged.set(expBytes.subarray(2), 2 + app1Segment.length);
+
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < merged.length; i += chunkSize) {
+      const sub = merged.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(sub));
+    }
+    return btoa(binary);
+  } catch (err) {
+    console.warn('[RetroCam] EXIF injection bypassed:', err);
+    return exportedBase64;
+  }
 }
 
 /**
@@ -198,10 +398,13 @@ function renderImageLayer(
   w: number,
   h: number,
   scale: number,
-  lens: LensType = 'prime'
+  lens: LensType = 'prime',
+  specularPeaks?: LuminancePeak[]
 ) {
   const isWide = lens === 'wide';
   const shift = Math.min(settings.rgbShift * w * 0.006 * (isWide ? 1.6 : 1.0), 3.5 * scale);
+  const p1 = specularPeaks?.[0] ?? { x: 0.5, y: 0.3, luminance: 0.8 };
+  const p2 = specularPeaks?.[1] ?? { x: 0.7, y: 0.22, luminance: 0.7 };
   return (
     <Group>
       <SkiaImage image={image} x={x} y={y} width={w} height={h} fit="cover">
@@ -237,14 +440,14 @@ function renderImageLayer(
       {/* Optical Star Cross Flare on Specular Highlights */}
       {lens === 'star' && (
         <Group blendMode="screen" opacity={0.65}>
-          {/* Primary highlight star */}
-          <Circle cx={x + w * 0.5} cy={y + h * 0.3} r={12 * scale} color="rgba(255,250,225,0.85)" />
-          <Rect x={x + w * 0.5 - 24 * scale} y={y + h * 0.3 - 0.75 * scale} width={48 * scale} height={1.5 * scale} color="rgba(255,250,225,0.75)" />
-          <Rect x={x + w * 0.5 - 0.75 * scale} y={y + h * 0.3 - 24 * scale} width={1.5 * scale} height={48 * scale} color="rgba(255,250,225,0.75)" />
-          {/* Secondary micro highlight star */}
-          <Circle cx={x + w * 0.7} cy={y + h * 0.22} r={8 * scale} color="rgba(255,245,210,0.75)" />
-          <Rect x={x + w * 0.7 - 16 * scale} y={y + h * 0.22 - 0.6 * scale} width={32 * scale} height={1.2 * scale} color="rgba(255,245,210,0.65)" />
-          <Rect x={x + w * 0.7 - 0.6 * scale} y={y + h * 0.22 - 16 * scale} width={1.2 * scale} height={32 * scale} color="rgba(255,245,210,0.65)" />
+          {/* Primary highlight star attached to dynamic specular peak */}
+          <Circle cx={x + w * p1.x} cy={y + h * p1.y} r={12 * scale} color="rgba(255,250,225,0.85)" />
+          <Rect x={x + w * p1.x - 24 * scale} y={y + h * p1.y - 0.75 * scale} width={48 * scale} height={1.5 * scale} color="rgba(255,250,225,0.75)" />
+          <Rect x={x + w * p1.x - 0.75 * scale} y={y + h * p1.y - 24 * scale} width={1.5 * scale} height={48 * scale} color="rgba(255,250,225,0.75)" />
+          {/* Secondary micro highlight star attached to dynamic specular peak */}
+          <Circle cx={x + w * p2.x} cy={y + h * p2.y} r={8 * scale} color="rgba(255,245,210,0.75)" />
+          <Rect x={x + w * p2.x - 16 * scale} y={y + h * p2.y - 0.6 * scale} width={32 * scale} height={1.2 * scale} color="rgba(255,245,210,0.65)" />
+          <Rect x={x + w * p2.x - 0.6 * scale} y={y + h * p2.y - 16 * scale} width={1.2 * scale} height={32 * scale} color="rgba(255,245,210,0.65)" />
         </Group>
       )}
 
@@ -292,7 +495,8 @@ function renderEffectLayer(
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  halationCenter?: LuminancePeak
 ) {
   // Resolution-adaptive frequencies
   const resFactor = Math.max(1, w / 390);
@@ -301,6 +505,7 @@ function renderEffectLayer(
   const dustFreq = 0.9 / sqrtRes;
   const scratchFreqX = 0.01 / sqrtRes;
   const scratchFreqY = 0.8 / sqrtRes;
+  const hc = halationCenter ?? { x: 0.5, y: 0.28, luminance: 0.5 };
 
   return (
     <Group>
@@ -347,10 +552,10 @@ function renderEffectLayer(
         <Group blendMode="screen">
           <Rect x={x} y={y} width={w} height={h}>
             <RadialGradient
-              c={vec(x + w * 0.5, y + h * 0.28)}
-              r={Math.max(w, h) * 0.55}
+              c={vec(x + w * hc.x, y + h * hc.y)}
+              r={Math.max(w, h) * (0.45 + hc.luminance * 0.15)}
               colors={[
-                `rgba(255,65,20,${settings.halation * 0.25})`,
+                `rgba(255,65,20,${settings.halation * 0.25 * (0.6 + hc.luminance * 0.4)})`,
                 `rgba(255,40,10,${settings.halation * 0.08})`,
                 'transparent',
               ]}
@@ -765,6 +970,9 @@ export interface FilteredSceneContentProps {
   scale: number;
   uri: string;
   lens?: LensType;
+  filterOpacity?: number;
+  halationCenter?: LuminancePeak;
+  specularPeaks?: LuminancePeak[];
 }
 
 export function FilteredSceneContent({
@@ -781,6 +989,9 @@ export function FilteredSceneContent({
   scale,
   uri,
   lens = 'prime',
+  filterOpacity = 1.0,
+  halationCenter,
+  specularPeaks,
 }: FilteredSceneContentProps) {
   const monoFont = useMemo(
     () => getSafeFont(Math.max(9, Math.round(12 * scale)), { isMono: true, fontWeight: 'bold' }),
@@ -794,6 +1005,16 @@ export function FilteredSceneContent({
     () => getSafeFont(Math.max(8, Math.round(11 * scale)), { isMono: false, fontWeight: 'bold' }),
     [scale]
   );
+
+  const peaks = useMemo(() => {
+    if (halationCenter && specularPeaks) {
+      return { halationCenter, specularPeaks };
+    }
+    return detectLuminancePeaks(image);
+  }, [image, halationCenter, specularPeaks]);
+
+  const activeHalationCenter = halationCenter ?? peaks.halationCenter;
+  const activeSpecularPeaks = specularPeaks ?? peaks.specularPeaks;
 
   // Common coordinates for normal frames
   const dateW = getTextWidth(monoFont, timestampStr);
@@ -821,8 +1042,11 @@ export function FilteredSceneContent({
       <Group>
         <Rect x={0} y={0} width={width} height={height} color="#FFFFFF" />
         <Group clip={{ x: pb, y: pb, width: imgW, height: imgH }}>
-          {renderImageLayer(image, secondaryImage, settings, colorMatrix, pb, pb, imgW, imgH, scale, lens)}
-          {renderEffectLayer(settings, leakParams, uri, pb, pb, imgW, imgH)}
+          <SkiaImage image={image} x={pb} y={pb} width={imgW} height={imgH} fit="cover" />
+          <Group opacity={filterOpacity}>
+            {renderImageLayer(image, secondaryImage, settings, colorMatrix, pb, pb, imgW, imgH, scale, lens, activeSpecularPeaks)}
+            {renderEffectLayer(settings, leakParams, uri, pb, pb, imgW, imgH, activeHalationCenter)}
+          </Group>
         </Group>
         <Rect
           x={pb}
@@ -847,13 +1071,19 @@ export function FilteredSceneContent({
         <Rect x={0} y={0} width={width} height={height} color="#000000" />
         {/* Left panel */}
         <Group clip={{ x: 4 * scale, y: 0, width: halfW, height }}>
-          {renderImageLayer(image, secondaryImage, settings, colorMatrix, 4 * scale, 0, halfW, height, scale, lens)}
-          {renderEffectLayer(settings, leakParams, uri, 4 * scale, 0, halfW, height)}
+          <SkiaImage image={image} x={4 * scale} y={0} width={halfW} height={height} fit="cover" />
+          <Group opacity={filterOpacity}>
+            {renderImageLayer(image, secondaryImage, settings, colorMatrix, 4 * scale, 0, halfW, height, scale, lens, activeSpecularPeaks)}
+            {renderEffectLayer(settings, leakParams, uri, 4 * scale, 0, halfW, height, activeHalationCenter)}
+          </Group>
         </Group>
         {/* Right panel */}
         <Group clip={{ x: halfW + 8 * scale, y: 0, width: halfW, height }}>
-          {renderImageLayer(image, secondaryImage, settings, colorMatrix, halfW + 8 * scale, 0, halfW, height, scale, lens)}
-          {renderEffectLayer(settings, leakParams, uri, halfW + 8 * scale, 0, halfW, height)}
+          <SkiaImage image={image} x={halfW + 8 * scale} y={0} width={halfW} height={height} fit="cover" />
+          <Group opacity={filterOpacity}>
+            {renderImageLayer(image, secondaryImage, settings, colorMatrix, halfW + 8 * scale, 0, halfW, height, scale, lens, activeSpecularPeaks)}
+            {renderEffectLayer(settings, leakParams, uri, halfW + 8 * scale, 0, halfW, height, activeHalationCenter)}
+          </Group>
         </Group>
         {/* Divider line */}
         <Rect x={halfW + 4 * scale} y={0} width={4 * scale} height={height} color="#111111" />
@@ -894,8 +1124,11 @@ export function FilteredSceneContent({
       <Group>
         <Rect x={0} y={0} width={width} height={height} color="#0A0A0A" />
         <Group clip={{ x: sw, y: 0, width: innerW, height }}>
-          {renderImageLayer(image, secondaryImage, settings, colorMatrix, sw, 0, innerW, height, scale, lens)}
-          {renderEffectLayer(settings, leakParams, uri, sw, 0, innerW, height)}
+          <SkiaImage image={image} x={sw} y={0} width={innerW} height={height} fit="cover" />
+          <Group opacity={filterOpacity}>
+            {renderImageLayer(image, secondaryImage, settings, colorMatrix, sw, 0, innerW, height, scale, lens, activeSpecularPeaks)}
+            {renderEffectLayer(settings, leakParams, uri, sw, 0, innerW, height, activeHalationCenter)}
+          </Group>
         </Group>
         {/* Left sprocket strip */}
         <Rect x={0} y={0} width={sw} height={height} color="#111111" />
@@ -938,8 +1171,11 @@ export function FilteredSceneContent({
       <Group>
         <Rect x={0} y={0} width={width} height={height} color="#000000" />
         <Group clip={{ x: cx - fishR, y: cy - fishR, width: fishR * 2, height: fishR * 2 }}>
-          {renderImageLayer(image, secondaryImage, settings, colorMatrix, cx - fishR, cy - fishR, fishR * 2, fishR * 2, scale, lens)}
-          {renderEffectLayer(settings, leakParams, uri, cx - fishR, cy - fishR, fishR * 2, fishR * 2)}
+          <SkiaImage image={image} x={cx - fishR} y={cy - fishR} width={fishR * 2} height={fishR * 2} fit="cover" />
+          <Group opacity={filterOpacity}>
+            {renderImageLayer(image, secondaryImage, settings, colorMatrix, cx - fishR, cy - fishR, fishR * 2, fishR * 2, scale, lens, activeSpecularPeaks)}
+            {renderEffectLayer(settings, leakParams, uri, cx - fishR, cy - fishR, fishR * 2, fishR * 2, activeHalationCenter)}
+          </Group>
         </Group>
         <Circle
           cx={cx}
@@ -959,8 +1195,11 @@ export function FilteredSceneContent({
   if (frameType === 'camcorder') {
     return (
       <Group>
-        {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens)}
-        {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height)}
+        <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
+        <Group opacity={filterOpacity}>
+          {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens, activeSpecularPeaks)}
+          {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height, activeHalationCenter)}
+        </Group>
         {renderCamcorderHUD(width, height, scale, timestampStr, !!settings.timestamp, monoFontSm)}
         {showWatermark && renderRetroCamWatermark(sansFont, wmX, wmY, scale)}
       </Group>
@@ -971,8 +1210,11 @@ export function FilteredSceneContent({
   if (frameType === 'vhs') {
     return (
       <Group>
-        {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens)}
-        {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height)}
+        <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
+        <Group opacity={filterOpacity}>
+          {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens, activeSpecularPeaks)}
+          {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height, activeHalationCenter)}
+        </Group>
         {/* Scanlines */}
         {Array.from({ length: Math.floor(height / (4 * scale)) }).map((_, i) => (
           <Rect
@@ -997,8 +1239,11 @@ export function FilteredSceneContent({
   if (frameType === 'digital') {
     return (
       <Group>
-        {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens)}
-        {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height)}
+        <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
+        <Group opacity={filterOpacity}>
+          {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens, activeSpecularPeaks)}
+          {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height, activeHalationCenter)}
+        </Group>
         {renderDigitalHUD(width, height, scale, timestampStr, !!settings.timestamp, monoFontSm)}
         {showWatermark && renderRetroCamWatermark(sansFont, wmX, wmY, scale)}
       </Group>
@@ -1008,8 +1253,11 @@ export function FilteredSceneContent({
   // ── DISPOSABLE / DEFAULT ──
   return (
     <Group>
-      {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens)}
-      {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height)}
+      <SkiaImage image={image} x={0} y={0} width={width} height={height} fit="cover" />
+      <Group opacity={filterOpacity}>
+        {renderImageLayer(image, secondaryImage, settings, colorMatrix, 0, 0, width, height, scale, lens, activeSpecularPeaks)}
+        {renderEffectLayer(settings, leakParams, uri, 0, 0, width, height, activeHalationCenter)}
+      </Group>
       {settings.timestamp && renderVintageDateStamp(timestampStr, monoFont, dateX, dateY, scale)}
       {showWatermark && renderRetroCamWatermark(sansFont, wmX, wmY, scale)}
     </Group>
@@ -1031,6 +1279,7 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
     overrides = {},
     aspectRatio = 'full',
     lens = 'prime',
+    filterOpacity = 1.0,
   },
   ref
 ) {
@@ -1046,6 +1295,11 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
   const colorMatrix = useMemo(
     () => buildColorMatrix(settings),
     [settings]
+  );
+
+  const { halationCenter, specularPeaks } = useMemo(
+    () => detectLuminancePeaks(image),
+    [image]
   );
 
   const timestampStr = useMemo(() => {
@@ -1114,7 +1368,12 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
           // If image has not loaded, fallback to onscreen canvas snapshot if present
           const snapshot = await canvasRef.current?.makeImageSnapshotAsync();
           if (!snapshot) return null;
-          const base64 = snapshot.encodeToBase64(ImageFormat.JPEG, 92);
+          let base64 = snapshot.encodeToBase64(ImageFormat.JPEG, 92);
+          try {
+            base64 = await injectExifFromOriginal(base64, uri);
+          } catch (exifErr) {
+            console.warn('[RetroCam] Failed to inject EXIF metadata:', exifErr);
+          }
           const filename = `retrocam_filtered_${Date.now()}.jpg`;
           const fileUri = (FileSystem.documentDirectory ?? '') + filename;
           await FileSystem.writeAsStringAsync(fileUri, base64, {
@@ -1133,60 +1392,82 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
         );
         const exportScale = exportW / 390;
 
-        const sceneElement = (
-          <FilteredSceneContent
-            image={image}
-            secondaryImage={secondaryImage}
-            settings={settings}
-            frameType={frameType}
-            colorMatrix={colorMatrix}
-            timestampStr={timestampStr}
-            leakParams={leakParams}
-            showWatermark={showWatermark}
-            width={exportW}
-            height={exportH}
-            scale={exportScale}
-            uri={uri}
-            lens={lens}
-          />
-        );
-
         let snapshot: SkImage | null = null;
 
-        // Tier 1 & Tier 2: Offscreen rendering with drawAsPicture
-        try {
-          const picture = await drawAsPicture(sceneElement, {
-            x: 0,
-            y: 0,
-            width: exportW,
-            height: exportH,
-          });
+        // Multi-resolution export ladder: 4096px (Tier 1 GPU -> Tier 2 CPU) -> 2560px (Tier 2b) -> 2048px (Tier 2c)
+        const ladderDimensions = [4096, 2560, 2048];
+        for (const targetDim of ladderDimensions) {
+          const { width: curW, height: curH } = getAspectDimensions(
+            nativeW,
+            nativeH,
+            aspectRatio,
+            targetDim
+          );
+          const curScale = curW / 390;
 
-          // Tier 1: GPU-backed offscreen surface
-          let surface: SkSurface | null = null;
+          const sceneElement = (
+            <FilteredSceneContent
+              image={image}
+              secondaryImage={secondaryImage}
+              settings={settings}
+              frameType={frameType}
+              colorMatrix={colorMatrix}
+              timestampStr={timestampStr}
+              leakParams={leakParams}
+              showWatermark={showWatermark}
+              width={curW}
+              height={curH}
+              scale={curScale}
+              uri={uri}
+              lens={lens}
+              filterOpacity={filterOpacity}
+              halationCenter={halationCenter}
+              specularPeaks={specularPeaks}
+            />
+          );
+
           try {
-            surface = Skia.Surface.MakeOffscreen(exportW, exportH);
-          } catch (gpuErr) {
-            console.warn('Skia.Surface.MakeOffscreen failed:', gpuErr);
-          }
+            const picture = await drawAsPicture(sceneElement, {
+              x: 0,
+              y: 0,
+              width: curW,
+              height: curH,
+            });
 
-          // Tier 2: CPU raster surface fallback
-          if (!surface) {
+            // Tier 1: GPU-backed offscreen surface
+            let surface: SkSurface | null = null;
             try {
-              surface = Skia.Surface.Make(exportW, exportH);
-            } catch (cpuErr) {
-              console.warn('Skia.Surface.Make failed:', cpuErr);
+              surface = Skia.Surface.MakeOffscreen(exportW, exportH);
+            } catch (gpuErr) {
+              console.warn('Skia.Surface.MakeOffscreen failed:', gpuErr);
             }
-          }
 
-          if (surface) {
-            const canvas = surface.getCanvas();
-            canvas.drawPicture(picture);
-            surface.flush();
-            snapshot = surface.makeImageSnapshot();
+            // Tier 2: CPU raster surface fallback
+            if (!surface) {
+              try {
+                surface = Skia.Surface.Make(exportW, exportH);
+              } catch (cpuErr) {
+                console.warn('Skia.Surface.Make failed:', cpuErr);
+              }
+            }
+
+            // Tier 2b / 2c: intermediate resolution surface fallback if 4096 failed
+            if (!surface && (curW !== exportW || curH !== exportH)) {
+              try {
+                surface = Skia.Surface.MakeOffscreen(curW, curH) ?? Skia.Surface.Make(curW, curH);
+              } catch {}
+            }
+
+            if (surface) {
+              const canvas = surface.getCanvas();
+              canvas.drawPicture(picture);
+              surface.flush();
+              snapshot = surface.makeImageSnapshot();
+              if (snapshot) break;
+            }
+          } catch (offscreenErr) {
+            console.warn(`Offscreen export failed at dimension ${targetDim}:`, offscreenErr);
           }
-        } catch (offscreenErr) {
-          console.warn('Offscreen export failed, falling back to onscreen snapshot:', offscreenErr);
         }
 
         // Tier 3: Onscreen canvas snapshot fallback
@@ -1196,7 +1477,13 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
 
         if (!snapshot) return null;
 
-        const base64 = snapshot.encodeToBase64(ImageFormat.JPEG, 92);
+        let base64 = snapshot.encodeToBase64(ImageFormat.JPEG, 92);
+        try {
+          base64 = await injectExifFromOriginal(base64, uri);
+        } catch (exifErr) {
+          console.warn('[RetroCam] Failed to inject EXIF metadata:', exifErr);
+        }
+
         const filename = `retrocam_filtered_${Date.now()}.jpg`;
         const fileUri = (FileSystem.documentDirectory ?? '') + filename;
         await FileSystem.writeAsStringAsync(fileUri, base64, {
@@ -1240,6 +1527,9 @@ export const FilteredImage = forwardRef<FilteredImageRef, FilteredImageProps>(fu
           scale={previewScale}
           uri={uri}
           lens={lens}
+          filterOpacity={filterOpacity}
+          halationCenter={halationCenter}
+          specularPeaks={specularPeaks}
         />
       </Canvas>
     </View>

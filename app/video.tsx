@@ -103,7 +103,10 @@ export default function VideoScreen() {
     }, 1000);
 
     try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+        codec: 'avc1',
+      });
 
       if (isMounted.current) {
         setIsRecording(false);

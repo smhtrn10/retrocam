@@ -9,3 +9,4 @@ ios/
 android/
 # EAS submit ASC API key (gizli)
 credentials/
+.agents/

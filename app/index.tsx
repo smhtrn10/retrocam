@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  PanResponder,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,17 @@ import {
   Video,
   FlipHorizontal,
   Lock,
+  Zap,
+  ZapOff,
+  Flame,
+  SunMedium,
+  Volume2,
+  VolumeX,
+  Timer,
+  Grid3x3,
+  Sliders,
 } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraCarousel } from '@/components/CameraCarousel';
 import { ShutterButton } from '@/components/ShutterButton';
 import { CameraPreset, CameraType as CamType, CAMERA_PRESETS, CAMERA_TYPE_ICONS, CAMERA_TYPE_LABELS } from '@/constants/presets';
@@ -33,7 +44,7 @@ import { usePurchases } from '@/hooks/usePurchases';
 import { useTrending } from '@/hooks/useTrending';
 import { useDevice } from '@/hooks/useDevice';
 import { CAMERA_LENSES, LensType } from '@/constants/lenses';
-import { playMechanicalShutterSound } from '@/utils/soundEngine';
+import { playMechanicalShutterSound, playTimerTickSound } from '@/utils/soundEngine';
 
 // ─────────────────────────────────────────────────────────────
 //  Viewfinder HUD Overlay (Requirement R6)
@@ -199,6 +210,47 @@ export default function CameraScreen() {
   const [selectedLens, setSelectedLens] = useState<LensType>('prime');
   const [showLensPicker, setShowLensPicker] = useState(false);
 
+  // Requirement R1: Camera Hardware Controls State
+  const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto' | 'torch'>('off');
+  const [timerSeconds, setTimerSeconds] = useState<0 | 3 | 10>(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [zoom, setZoom] = useState<number>(0);
+  const zoomRef = useRef(zoom);
+  const touchStartDistRef = useRef<number | null>(null);
+  const touchStartZoomRef = useRef<number>(0);
+
+  const [ev, setEv] = useState<number>(0);
+  const [showEvControls, setShowEvControls] = useState<boolean>(false);
+
+  // Tap-to-Focus Reticle State
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const focusAnimScale = useRef(new Animated.Value(1.5)).current;
+  const focusAnimOpacity = useRef(new Animated.Value(0)).current;
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autofocus, setAutofocus] = useState<'on' | 'off'>('on');
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('camera_shutter_muted').then((v) => {
+      if (v !== null) setIsMuted(v === 'true');
+    }).catch(() => {});
+    AsyncStorage.getItem('camera_grid_enabled').then((v) => {
+      if (v !== null) setShowGrid(v === 'true');
+    }).catch(() => {});
+
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
@@ -300,17 +352,158 @@ export default function CameraScreen() {
     });
   }, [nameOpacity, nameTranslateY]);
 
-  const handleCapture = useCallback(async () => {
+  const cycleFlashMode = useCallback(() => {
+    const modes: Array<'off' | 'on' | 'auto' | 'torch'> = ['off', 'on', 'auto', 'torch'];
+    const next = modes[(modes.indexOf(flashMode) + 1) % modes.length];
+    setFlashMode(next);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [flashMode]);
+
+  const cycleTimer = useCallback(() => {
+    const timers: Array<0 | 3 | 10> = [0, 3, 10];
+    const next = timers[(timers.indexOf(timerSeconds) + 1) % timers.length];
+    setTimerSeconds(next);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [timerSeconds]);
+
+  const toggleGrid = useCallback(() => {
+    setShowGrid((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem('camera_grid_enabled', next ? 'true' : 'false').catch(() => {});
+      return next;
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem('camera_shutter_muted', next ? 'true' : 'false').catch(() => {});
+      return next;
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const handleViewfinderTap = useCallback((x: number, y: number) => {
+    setFocusPoint({ x, y });
+    focusAnimScale.setValue(1.5);
+    focusAnimOpacity.setValue(1);
+
+    Animated.spring(focusAnimScale, {
+      toValue: 1.0,
+      friction: 5,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    setAutofocus('off');
+    setTimeout(() => setAutofocus('on'), 50);
+
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    focusTimeoutRef.current = setTimeout(() => {
+      Animated.timing(focusAnimOpacity, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }).start(() => setFocusPoint(null));
+    }, 1800);
+  }, [focusAnimScale, focusAnimOpacity]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return gestureState.numberActiveTouches === 2;
+        },
+        onPanResponderGrant: (evt) => {
+          if (evt.nativeEvent.touches.length === 2) {
+            const t1 = evt.nativeEvent.touches[0];
+            const t2 = evt.nativeEvent.touches[1];
+            const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
+            touchStartDistRef.current = dist;
+            touchStartZoomRef.current = zoomRef.current;
+          }
+        },
+        onPanResponderMove: (evt) => {
+          if (
+            evt.nativeEvent.touches.length === 2 &&
+            touchStartDistRef.current &&
+            touchStartDistRef.current > 0
+          ) {
+            const t1 = evt.nativeEvent.touches[0];
+            const t2 = evt.nativeEvent.touches[1];
+            const dist = Math.hypot(t2.pageX - t1.pageX, t2.pageY - t1.pageY);
+            const factor = dist / touchStartDistRef.current;
+            const delta = (factor - 1) * 0.6;
+            const newZoom = Math.min(1.0, Math.max(0.0, touchStartZoomRef.current + delta));
+            setZoom(Number(newZoom.toFixed(3)));
+          }
+        },
+        onPanResponderRelease: (evt, gestureState) => {
+          touchStartDistRef.current = null;
+          if (
+            Math.abs(gestureState.dx) < 10 &&
+            Math.abs(gestureState.dy) < 10 &&
+            evt.nativeEvent.locationX !== undefined &&
+            evt.nativeEvent.locationY !== undefined
+          ) {
+            handleViewfinderTap(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+          }
+        },
+      }),
+    [handleViewfinderTap]
+  );
+
+  const handleCaptureRef = useRef<(skipTimer?: boolean) => Promise<void>>(async () => {});
+
+  const handleCapture = useCallback(async (skipTimer = false) => {
     if (isCapturing || !cameraRef.current) return;
+
+    if (countdown !== null) {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+      setCountdown(null);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    if (timerSeconds > 0 && !skipTimer) {
+      setCountdown(timerSeconds);
+      playTimerTickSound();
+      let remaining = timerSeconds;
+      countdownIntervalRef.current = setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) {
+          setCountdown(remaining);
+          playTimerTickSound();
+        } else {
+          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+          setCountdown(null);
+          void handleCaptureRef.current(true);
+        }
+      }, 1000);
+      return;
+    }
+
     setIsCapturing(true);
 
     // Tactile mechanical shutter flash feedback & acoustic feedback (Requirement R6 + Audio)
     triggerShutterFlash();
-    playMechanicalShutterSound(selectedPreset.cameraType);
+    if (!isMuted) {
+      playMechanicalShutterSound(selectedPreset.cameraType);
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.9,
+        skipProcessing: false,
+        shutterSound: !isMuted,
+      });
       if (photo && isMounted.current) {
         if (isDoubleExposureMode) {
           if (!doubleExposureFirstPhoto) {
@@ -327,6 +520,7 @@ export default function CameraScreen() {
                 presetId: selectedPreset.id,
                 aspectRatio,
                 lens: selectedLens,
+                ev: ev !== 0 ? String(ev) : undefined,
               },
             });
           }
@@ -338,6 +532,7 @@ export default function CameraScreen() {
               presetId: selectedPreset.id,
               aspectRatio,
               lens: selectedLens,
+              ev: ev !== 0 ? String(ev) : undefined,
             },
           });
         }
@@ -347,7 +542,11 @@ export default function CameraScreen() {
     } finally {
       if (isMounted.current) setIsCapturing(false);
     }
-  }, [isCapturing, selectedPreset, isDoubleExposureMode, doubleExposureFirstPhoto, aspectRatio, selectedLens, triggerShutterFlash]);
+  }, [isCapturing, countdown, timerSeconds, isMuted, selectedPreset, isDoubleExposureMode, doubleExposureFirstPhoto, aspectRatio, selectedLens, ev, triggerShutterFlash]);
+
+  useEffect(() => {
+    handleCaptureRef.current = handleCapture;
+  }, [handleCapture]);
 
   const handleGalleryImport = useCallback(async () => {
     try {
@@ -439,7 +638,27 @@ export default function CameraScreen() {
                 style={StyleSheet.absoluteFill}
                 facing={facing}
                 mode="picture"
+                flash={flashMode === 'torch' ? 'off' : flashMode}
+                enableTorch={flashMode === 'torch'}
+                zoom={zoom}
+                autofocus={autofocus}
                 responsiveOrientationWhenOrientationLocked
+              />
+            )}
+
+            {/* Real-time EV Exposure Compensation Viewfinder Simulation Overlay */}
+            {ev !== 0 && (
+              <View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  {
+                    backgroundColor: ev > 0 ? '#FFFFFF' : '#000000',
+                    opacity: ev > 0
+                      ? Math.min(0.45, (ev / 2.0) * 0.35)
+                      : Math.min(0.65, (Math.abs(ev) / 2.0) * 0.5),
+                  },
+                ]}
               />
             )}
 
@@ -499,12 +718,49 @@ export default function CameraScreen() {
               </View>
             )}
 
+            {/* Tap-to-Focus & Pinch-to-Zoom Gesture Surface */}
+            <View
+              style={StyleSheet.absoluteFillObject}
+              {...panResponder.panHandlers}
+            />
+
+            {/* Animated Tap-to-Focus Reticle Ring */}
+            {focusPoint && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.focusReticle,
+                  {
+                    left: focusPoint.x - 30,
+                    top: focusPoint.y - 30,
+                    opacity: focusAnimOpacity,
+                    transform: [{ scale: focusAnimScale }],
+                  },
+                ]}
+              >
+                <View style={styles.focusReticleBox}>
+                  <View style={[styles.reticleCorner, styles.rcTL]} />
+                  <View style={[styles.reticleCorner, styles.rcTR]} />
+                  <View style={[styles.reticleCorner, styles.rcBL]} />
+                  <View style={[styles.reticleCorner, styles.rcBR]} />
+                  <View style={styles.reticlePip} />
+                </View>
+                <View style={styles.reticleSun}>
+                  <SunMedium size={12} color="#FFB800" />
+                </View>
+              </Animated.View>
+            )}
+
             {/* Focus Brackets & Grid Lines */}
             <View style={styles.viewfinderFocusOverlay} pointerEvents="none">
-              <View style={styles.gridLineH1} />
-              <View style={styles.gridLineH2} />
-              <View style={styles.gridLineV1} />
-              <View style={styles.gridLineV2} />
+              {showGrid && (
+                <>
+                  <View style={styles.gridLineH1} />
+                  <View style={styles.gridLineH2} />
+                  <View style={styles.gridLineV1} />
+                  <View style={styles.gridLineV2} />
+                </>
+              )}
               
               <View style={styles.focusBrackets}>
                 <View style={[styles.focusBracket, styles.bracketTL]} />
@@ -522,6 +778,88 @@ export default function CameraScreen() {
               <Text style={styles.viewfinderTimestamp} pointerEvents="none">
                 {new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}
               </Text>
+            )}
+
+            {/* Self-Timer Visual Countdown Badge */}
+            {countdown !== null && (
+              <View style={styles.countdownOverlay} pointerEvents="none">
+                <View style={styles.countdownBadge}>
+                  <Text style={[styles.countdownText, { fontSize: 64 * uiScale }]}>{countdown}</Text>
+                </View>
+                <Text style={[styles.countdownSubtext, { fontSize: 10 * uiScale }]}>TAP SHUTTER TO CANCEL</Text>
+              </View>
+            )}
+
+            {/* Floating Zoom Factor Pill & Quick Steps */}
+            <View style={styles.zoomFactorPill}>
+              <View style={styles.zoomCurrentBadge}>
+                <Text style={[styles.zoomCurrentText, { fontSize: 10 * uiScale }]}>{(1 + zoom * 4).toFixed(1)}x</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.zoomStepButton, zoom === 0 && styles.zoomStepButtonActive]}
+                onPress={() => {
+                  setZoom(0);
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={[styles.zoomStepText, { fontSize: 10 * uiScale }, zoom === 0 && styles.zoomStepTextActive]}>1x</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.zoomStepButton, Math.abs(zoom - 0.25) < 0.02 && styles.zoomStepButtonActive]}
+                onPress={() => {
+                  setZoom(0.25);
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={[styles.zoomStepText, { fontSize: 10 * uiScale }, Math.abs(zoom - 0.25) < 0.02 && styles.zoomStepTextActive]}>2x</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.zoomStepButton, zoom === 1 && styles.zoomStepButtonActive]}
+                onPress={() => {
+                  setZoom(1.0);
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={[styles.zoomStepText, { fontSize: 10 * uiScale }, zoom === 1 && styles.zoomStepTextActive]}>5x</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Floating EV Quick Adjustment Panel */}
+            {showEvControls && (
+              <View style={styles.evSelectorPanel}>
+                <TouchableOpacity
+                  style={styles.evStepBtn}
+                  onPress={() => {
+                    setEv((v) => Math.max(-2, +(v - 0.5).toFixed(1)));
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[styles.evStepBtnText, { fontSize: 14 * uiScale }]}>-</Text>
+                </TouchableOpacity>
+                {[-2.0, -1.0, 0.0, 1.0, 2.0].map((step) => (
+                  <TouchableOpacity
+                    key={step}
+                    style={[styles.evPill, ev === step && styles.evPillActive]}
+                    onPress={() => {
+                      setEv(step);
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={[styles.evPillText, { fontSize: 9 * uiScale }, ev === step && styles.evPillTextActive]}>
+                      {step === 0 ? '±0' : (step > 0 ? `+${step.toFixed(0)}` : step.toFixed(0))}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.evStepBtn}
+                  onPress={() => {
+                    setEv((v) => Math.min(2, +(v + 0.5).toFixed(1)));
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[styles.evStepBtnText, { fontSize: 14 * uiScale }]}>+</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Mechanical Shutter Flash Feedback Overlay (Requirement R6) */}
@@ -551,11 +889,34 @@ export default function CameraScreen() {
 
         {/* ── Top bar ── */}
         <View style={[styles.topBar, { paddingTop: isTablet ? 20 : 10, paddingHorizontal: isTablet ? 32 : 16 }]}>
-          {!isSnapMode && (
-            <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={() => router.push('/settings')}>
-              <Settings size={22 * uiScale} color="#FFFFFF" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * uiScale }}>
+            {!isSnapMode && (
+              <TouchableOpacity
+                style={[styles.iconButton, { width: 40 * uiScale, height: 40 * uiScale, borderRadius: 20 * uiScale }]}
+                onPress={() => router.push('/settings')}
+              >
+                <Settings size={20 * uiScale} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                flashMode !== 'off' && styles.iconButtonActive,
+                { width: 40 * uiScale, height: 40 * uiScale, borderRadius: 20 * uiScale },
+              ]}
+              onPress={cycleFlashMode}
+            >
+              {flashMode === 'off' && <ZapOff size={18 * uiScale} color="#FFFFFF" />}
+              {flashMode === 'on' && <Zap size={18 * uiScale} color="#FFB800" />}
+              {flashMode === 'auto' && (
+                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={16 * uiScale} color="#FFFFFF" />
+                  <Text style={{ position: 'absolute', right: -6, bottom: -4, fontSize: 8 * uiScale, fontWeight: '900', color: '#FFB800' }}>A</Text>
+                </View>
+              )}
+              {flashMode === 'torch' && <Flame size={18 * uiScale} color="#FF8C00" />}
             </TouchableOpacity>
-          )}
+          </View>
 
           <View style={styles.topBarCenter}>
             {!isPro ? (
@@ -573,6 +934,19 @@ export default function CameraScreen() {
             <View style={styles.controlsRow}>
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.controlBtn, showGrid && styles.controlBtnActive]} onPress={toggleGrid}>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale, color: showGrid ? '#FFB800' : '#FFF' }]}>GRID</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.controlBtn, timerSeconds > 0 && styles.controlBtnActive]} onPress={cycleTimer}>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale, color: timerSeconds > 0 ? '#FFB800' : '#FFF' }]}>
+                  {timerSeconds === 0 ? 'TIMER' : `${timerSeconds}S`}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.controlBtn, ev !== 0 && styles.controlBtnActive]} onPress={() => setShowEvControls((v) => !v)}>
+                <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale, color: ev !== 0 ? '#FFB800' : '#FFF' }]}>
+                  {ev === 0 ? 'EV ±0' : (ev > 0 ? `EV +${ev.toFixed(1)}` : `EV ${ev.toFixed(1)}`)}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.controlBtn, selectedLens !== 'prime' && styles.controlBtnActive]}
@@ -598,9 +972,28 @@ export default function CameraScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.iconButton, { width: 44 * uiScale, height: 44 * uiScale, borderRadius: 22 * uiScale }]} onPress={toggleCamera}>
-            <FlipHorizontal size={22 * uiScale} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * uiScale }}>
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                isMuted && styles.iconButtonActive,
+                { width: 40 * uiScale, height: 40 * uiScale, borderRadius: 20 * uiScale },
+              ]}
+              onPress={toggleMute}
+            >
+              {isMuted ? (
+                <VolumeX size={18 * uiScale} color="#FF453A" />
+              ) : (
+                <Volume2 size={18 * uiScale} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconButton, { width: 40 * uiScale, height: 40 * uiScale, borderRadius: 20 * uiScale }]}
+              onPress={toggleCamera}
+            >
+              <FlipHorizontal size={20 * uiScale} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Preset name overlay (big, centered) ── */}
@@ -974,6 +1367,173 @@ const styles = StyleSheet.create({
   iconButton: {
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center', alignItems: 'center',
+  },
+  iconButtonActive: {
+    backgroundColor: 'rgba(255,184,0,0.18)',
+    borderWidth: 1,
+    borderColor: '#FFB800',
+  },
+  focusReticle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 30,
+  },
+  focusReticleBox: {
+    width: 48,
+    height: 48,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reticleCorner: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderColor: '#FFB800',
+  },
+  rcTL: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2 },
+  rcTR: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2 },
+  rcBL: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2 },
+  rcBR: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2 },
+  reticlePip: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFB800',
+  },
+  reticleSun: {
+    position: 'absolute',
+    right: -12,
+    top: '50%',
+    marginTop: -6,
+  },
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 40,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  countdownBadge: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderWidth: 3,
+    borderColor: '#FFB800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFB800',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  countdownText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Courier-Bold' : 'monospace',
+  },
+  countdownSubtext: {
+    marginTop: 16,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.4)',
+  },
+  zoomFactorPill: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 16,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    zIndex: 25,
+  },
+  zoomCurrentBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(255,184,0,0.2)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,184,0,0.5)',
+  },
+  zoomCurrentText: {
+    color: '#FFB800',
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Courier-Bold' : 'monospace',
+  },
+  zoomStepButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  zoomStepButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  zoomStepText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '700',
+  },
+  zoomStepTextActive: {
+    color: '#FFFFFF',
+  },
+  evSelectorPanel: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#FFB800',
+    zIndex: 35,
+  },
+  evStepBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  evStepBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  evPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  evPillActive: {
+    backgroundColor: '#FFB800',
+  },
+  evPillText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '700',
+  },
+  evPillTextActive: {
+    color: '#000000',
+    fontWeight: '900',
   },
   dailyPill: {
     flexDirection: 'row',

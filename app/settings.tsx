@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   View,
@@ -14,7 +14,8 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as StoreReview from 'expo-store-review';
-import { X, Crown, RefreshCcw, Mail, Shield, Star } from 'lucide-react-native';
+import { X, Crown, RefreshCcw, Mail, Shield, Star, Grid3x3, Volume2, VolumeX } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
 
@@ -24,6 +25,36 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete, simulateDevPurchase, setIsProOverride } = usePurchases();
   const { isTablet, scale: uiScale } = useDevice();
+
+  const [showGrid, setShowGrid] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('camera_grid_enabled').then((val) => {
+      if (val !== null) setShowGrid(val === 'true');
+    }).catch(() => {});
+    AsyncStorage.getItem('camera_shutter_muted').then((val) => {
+      if (val !== null) setIsMuted(val === 'true');
+    }).catch(() => {});
+  }, []);
+
+  const toggleGrid = useCallback(() => {
+    setShowGrid((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem('camera_grid_enabled', next ? 'true' : 'false').catch(() => {});
+      return next;
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem('camera_shutter_muted', next ? 'true' : 'false').catch(() => {});
+      return next;
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
 
   const handleRestore = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -112,6 +143,30 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.row} onPress={handleRestore}>
             <RefreshCcw size={20 * uiScale} color="#888888" />
             <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>{t('settings.restore')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.section, { paddingHorizontal: isTablet ? 0 : 16 }]}>
+          <Text style={[styles.sectionTitle, { fontSize: 12 * uiScale }]}>Camera Controls</Text>
+
+          <TouchableOpacity style={styles.row} onPress={toggleGrid}>
+            <Grid3x3 size={20 * uiScale} color={showGrid ? "#FFB800" : "#888888"} />
+            <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>Composition Grid (3x3)</Text>
+            <Text style={[styles.valueText, { color: showGrid ? '#FFB800' : '#888888', fontSize: 13 * uiScale }]}>
+              {showGrid ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.row} onPress={toggleMute}>
+            {isMuted ? (
+              <VolumeX size={20 * uiScale} color="#FF453A" />
+            ) : (
+              <Volume2 size={20 * uiScale} color="#888888" />
+            )}
+            <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>Shutter Sound</Text>
+            <Text style={[styles.valueText, { color: isMuted ? '#FF453A' : '#4CD964', fontSize: 13 * uiScale }]}>
+              {isMuted ? 'MUTED' : 'ON'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -261,6 +316,10 @@ const styles = StyleSheet.create({
   rowText: {
     color: '#FFFFFF',
     flex: 1,
+  },
+  valueText: {
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   devText: {
     color: 'rgba(255,100,100,0.8)',
