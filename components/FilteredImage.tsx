@@ -409,14 +409,14 @@ function renderImageLayer(
     <Group>
       <SkiaImage image={image} x={x} y={y} width={w} height={h} fit="cover">
         <ColorMatrix matrix={colorMatrix} />
-        {settings.blur > 0 && <Blur blur={settings.blur * 8 * scale} />}
+        {settings.blur > 0 && <Blur blur={Math.min(settings.blur * 2.5 * scale, 0.45 * scale)} />}
       </SkiaImage>
 
       {secondaryImage && (
         <Group blendMode="screen" opacity={0.5}>
           <SkiaImage image={secondaryImage} x={x} y={y} width={w} height={h} fit="cover">
             <ColorMatrix matrix={colorMatrix} />
-            {settings.blur > 0 && <Blur blur={settings.blur * 8 * scale} />}
+            {settings.blur > 0 && <Blur blur={Math.min(settings.blur * 2.5 * scale, 0.45 * scale)} />}
           </SkiaImage>
         </Group>
       )}
@@ -578,15 +578,15 @@ function renderEffectLayer(
       )}
       {/* 100% Monochrome Silver Halide Film Grain (zero rainbow RGB noise) */}
       {settings.grain > 0 && (
-        <Group blendMode="softLight" opacity={settings.grain * 0.42}>
+        <Group blendMode="softLight" opacity={settings.grain * 0.35}>
           <Rect x={x} y={y} width={w} height={h}>
             <Turbulence freqX={grainFreq} freqY={grainFreq} octaves={1} seed={getSeedFromUri(uri)} />
             <ColorMatrix
               matrix={[
-                0.35, 0.35, 0.30, 0, 0.15,
-                0.35, 0.35, 0.30, 0, 0.15,
-                0.35, 0.35, 0.30, 0, 0.15,
-                0,    0,    0,    0, 1,
+                0.35, 0.35, 0.30, 0, 0,
+                0.35, 0.35, 0.30, 0, 0,
+                0.35, 0.35, 0.30, 0, 0,
+                0,    0,    0,    1, 0,
               ]}
             />
           </Rect>

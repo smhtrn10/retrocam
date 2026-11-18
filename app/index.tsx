@@ -3,6 +3,7 @@ import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
+  ScrollView,
   TouchableOpacity,
   Text,
   ActivityIndicator,
@@ -225,6 +226,35 @@ export default function CameraScreen() {
 
   const [ev, setEv] = useState<number>(0);
   const [showEvControls, setShowEvControls] = useState<boolean>(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
+
+  const handleCameraReady = useCallback(async () => {
+    try {
+      if (cameraRef.current && typeof (cameraRef.current as any).getAvailablePictureSizesAsync === 'function') {
+        const sizes = await (cameraRef.current as any).getAvailablePictureSizesAsync();
+        if (Array.isArray(sizes) && sizes.length > 0) {
+          let bestSize = sizes[0];
+          let maxPixels = 0;
+          for (const s of sizes) {
+            const parts = s.split('x');
+            if (parts.length === 2) {
+              const w = parseInt(parts[0], 10);
+              const h = parseInt(parts[1], 10);
+              if (!isNaN(w) && !isNaN(h) && w * h > maxPixels) {
+                maxPixels = w * h;
+                bestSize = s;
+              }
+            }
+          }
+          if (bestSize) {
+            setPictureSize(bestSize);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[RetroCam] Failed to get available picture sizes:', e);
+    }
+  }, []);
 
   // Tap-to-Focus Reticle State
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
@@ -511,7 +541,7 @@ export default function CameraScreen() {
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.95,
+        quality: 0.99,
         skipProcessing: false,
         shutterSound: !isMuted,
       });
@@ -653,6 +683,8 @@ export default function CameraScreen() {
                 enableTorch={flashMode === 'torch'}
                 zoom={zoom}
                 autofocus={autofocus}
+                pictureSize={pictureSize}
+                onCameraReady={handleCameraReady}
                 responsiveOrientationWhenOrientationLocked
               />
             )}
@@ -840,6 +872,7 @@ export default function CameraScreen() {
               <View style={styles.evSelectorPanel}>
                 <TouchableOpacity
                   style={styles.evStepBtn}
+                  hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
                   onPress={() => {
                     setEv((v) => Math.max(-2, +(v - 0.5).toFixed(1)));
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -851,6 +884,7 @@ export default function CameraScreen() {
                   <TouchableOpacity
                     key={step}
                     style={[styles.evPill, ev === step && styles.evPillActive]}
+                    hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
                     onPress={() => {
                       setEv(step);
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -863,6 +897,7 @@ export default function CameraScreen() {
                 ))}
                 <TouchableOpacity
                   style={styles.evStepBtn}
+                  hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
                   onPress={() => {
                     setEv((v) => Math.min(2, +(v + 0.5).toFixed(1)));
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -942,7 +977,12 @@ export default function CameraScreen() {
               </TouchableOpacity>
             )}
             
-            <View style={styles.controlsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.controlsScrollView}
+              contentContainerStyle={styles.controlsRow}
+            >
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
               </TouchableOpacity>
@@ -980,7 +1020,7 @@ export default function CameraScreen() {
               <TouchableOpacity style={[styles.controlBtn, isSnapMode && styles.controlBtnActive]} onPress={toggleSnapMode}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>SNAP</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * uiScale }}>
@@ -1505,18 +1545,23 @@ const styles = StyleSheet.create({
   },
   evSelectorPanel: {
     position: 'absolute',
-    top: 12,
+    bottom: 50,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderRadius: 18,
     paddingHorizontal: 8,
     paddingVertical: 5,
     gap: 6,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#FFB800',
-    zIndex: 35,
+    zIndex: 50,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   evStepBtn: {
     width: 24,
@@ -1558,8 +1603,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,184,0,0.3)',
   },
   dailyText: { color: '#FFB800', fontWeight: '700' },
-  topBarCenter: { alignItems: 'center', gap: 10 },
-  controlsRow: { flexDirection: 'row', gap: 8 },
+  topBarCenter: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 4,
+  },
+  controlsScrollView: {
+    maxWidth: '100%',
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+  },
   controlBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
