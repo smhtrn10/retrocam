@@ -9,25 +9,39 @@ import {
   Linking,
   Platform,
   Alert,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as StoreReview from 'expo-store-review';
-import { X, Crown, RefreshCcw, Mail, Shield, Star, Grid3x3, Volume2, VolumeX } from 'lucide-react-native';
+import { markAppReviewed } from '@/utils/storeReview';
+import { X, Crown, RefreshCcw, Mail, Shield, Star, Grid3x3, Volume2, VolumeX, Globe, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePurchases } from '@/hooks/usePurchases';
 import { useDevice } from '@/hooks/useDevice';
+import { SUPPORTED_LANGUAGES, setAppLanguage, type SupportedLanguage } from '@/i18n';
 
 const SHOW_DEV_TOOLS = true ;
 
 export default function SettingsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isPro, restorePurchases, showPaywall, subscriptionPlan, setOnboardingComplete, simulateDevPurchase, setIsProOverride } = usePurchases();
   const { isTablet, scale: uiScale } = useDevice();
 
   const [showGrid, setShowGrid] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const currentLang = (i18n.language || 'en').toLowerCase().split('-')[0];
+  const currentLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLang) || SUPPORTED_LANGUAGES[0];
+
+  const handleSelectLanguage = async (code: SupportedLanguage) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await setAppLanguage(code);
+    setLanguageModalVisible(false);
+  };
 
   useEffect(() => {
     AsyncStorage.getItem('camera_grid_enabled').then((val) => {
@@ -78,11 +92,14 @@ export default function SettingsScreen() {
 
   const handleRateApp = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (Platform.OS === 'ios') {
+    try {
       const isAvailable = await StoreReview.isAvailableAsync();
       if (isAvailable) {
         await StoreReview.requestReview();
+        await markAppReviewed();
       }
+    } catch (e) {
+      console.warn('Store review error:', e);
     }
   }, []);
 
@@ -143,6 +160,18 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.row} onPress={handleRestore}>
             <RefreshCcw size={20 * uiScale} color="#888888" />
             <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>{t('settings.restore')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.section, { paddingHorizontal: isTablet ? 0 : 16 }]}>
+          <Text style={[styles.sectionTitle, { fontSize: 12 * uiScale }]}>{t('settings.language', 'Language')}</Text>
+
+          <TouchableOpacity style={styles.row} onPress={() => setLanguageModalVisible(true)}>
+            <Globe size={20 * uiScale} color="#FFB800" />
+            <Text style={[styles.rowText, { fontSize: 16 * uiScale }]}>{t('settings.language', 'Language')}</Text>
+            <Text style={[styles.valueText, { color: '#FFB800', fontSize: 14 * uiScale }]}>
+              {currentLangObj.nativeName}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -234,6 +263,46 @@ export default function SettingsScreen() {
           <Text style={[styles.copyright, { fontSize: 12 * uiScale }]}>Made with love for vintage photography</Text>
         </View>
       </ScrollView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('settings.language', 'Language')}</Text>
+              <TouchableOpacity onPress={() => setLanguageModalVisible(false)} style={styles.modalCloseButton}>
+                <X size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={SUPPORTED_LANGUAGES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => {
+                const isSelected = item.code === currentLang;
+                return (
+                  <TouchableOpacity
+                    style={[styles.languageItem, isSelected && styles.languageItemSelected]}
+                    onPress={() => handleSelectLanguage(item.code)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.languageNative, isSelected && { color: '#FFB800' }]}>
+                        {item.nativeName}
+                      </Text>
+                      <Text style={styles.languageLabel}>{item.label}</Text>
+                    </View>
+                    {isSelected && <Check size={20} color="#FFB800" />}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -334,5 +403,62 @@ const styles = StyleSheet.create({
   },
   copyright: {
     color: '#444444',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1C1C1E',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  languageItemSelected: {
+    backgroundColor: 'rgba(255,184,0,0.1)',
+  },
+  languageNative: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  languageLabel: {
+    color: '#888888',
+    fontSize: 13,
+    marginTop: 2,
   },
 });

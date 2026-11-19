@@ -94,7 +94,9 @@
       "allow": "İzin Ver ve Devam Et",
       "skip": "Devam Et →",
       "granted": "Hazırsın!",
-      "requesting": "İsteniyor…"
+      "requesting": "İsteniyor…",
+      "camera_required_title": "Kamera İzni Gerekli",
+      "camera_required_desc": "RetroCam nostaljik fotoğraf ve video çekmek için kamera erişimine ihtiyaç duyar. Devam etmek için lütfen kamera izni verin."
     },
     "paywall": {
       "title": "Vintage Estetiğinin Kilidini Aç",
@@ -228,7 +230,11 @@
     "benefit_3": "Reklam yok, filigran yok",
     "benefit_4": "Öncelikli yapay zeka işleme",
     "benefit_5": "Özel altın saat özellikleri",
-    "benefit_6": "İstediğin zaman iptal et"
+    "benefit_6": "İstediğin zaman iptal et",
+    "counter_verb": "düzenliyor",
+    "continue_btn": "Devam Et",
+    "trial_disclaimer": "3 gün ücretsiz deneme, ardından {{price}}/yıl",
+    "people_verb": "kişi şu anda {{verb}}"
   },
   "permission": {
     "title": "Erişim Gerekli",
@@ -251,7 +257,9 @@
     "success": "Başarılı",
     "ok": "Tamam",
     "privacy_policy": "Gizlilik Politikası",
-    "terms_of_use": "Kullanım Koşulları"
+    "terms_of_use": "Kullanım Koşulları",
+    "cancel": "İptal",
+    "open_settings": "Ayarları Aç"
   },
   "settings": {
     "title": "Ayarlar",
@@ -263,7 +271,10 @@
     "restore": "Satın Almaları Kurtar",
     "rate": "RetroCam'i Değerlendir",
     "contact": "Destekle İletişime Geç",
-    "privacy": "Gizlilik Politikası"
+    "privacy": "Gizlilik Politikası",
+    "language": "Dil",
+    "rate_app": "RetroCam'i Değerlendir",
+    "terms": "Kullanım Koşulları"
   },
   "video": {
     "hint": "9:16 · Max 60s · Galeriye Kaydeder",
@@ -275,10 +286,10 @@
     }
   },
   "camera_types": {
+    "120": "120 Format",
     "disposable": "Kullan At",
     "modern": "Modern",
     "vhs": "VHS",
-    "120": "120 Format",
     "8mm": "8mm Sinema",
     "digital-y2k": "Y2K Dijital",
     "half-frame": "Yarım Kare",
@@ -288,5 +299,11 @@
     "16mm": "16mm Sinema",
     "camcorder": "El Kamerası",
     "special": "Özel"
+  },
+  "camera": {
+    "permission_required": "Kamera Erişimi Gerekli",
+    "permission_desc": "RetroCam, nostaljik fotoğraf ve video çekmek için kamera erişimine ihtiyaç duyar.",
+    "enable_camera": "Kamerayı Etkinleştir",
+    "open_settings": "Ayarları Aç"
   }
 }

@@ -65,9 +65,9 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
   useEffect(() => {
     const isCurrentValid = selectedPackage && packages.some(p => p.identifier === selectedPackage);
     if (packages.length > 0 && !isCurrentValid) {
-      const annual = packages.find(p => p.packageType === 'ANNUAL' || p.identifier.toLowerCase().includes('annual') || p.identifier.toLowerCase().includes('year'));
-      const monthly = packages.find(p => p.packageType === 'MONTHLY' || p.identifier.toLowerCase().includes('month'));
-      const weekly = packages.find(p => p.packageType === 'WEEKLY' || p.identifier.toLowerCase().includes('week'));
+      const annual = packages.find(p => p.packageType === 'ANNUAL' || p.identifier.toLowerCase().includes('annual') || p.identifier.toLowerCase().includes('year') || p.product?.identifier?.toLowerCase().includes('annual'));
+      const monthly = packages.find(p => p.packageType === 'MONTHLY' || p.identifier.toLowerCase().includes('month') || p.product?.identifier?.toLowerCase().includes('month'));
+      const weekly = packages.find(p => p.packageType === 'WEEKLY' || p.identifier.toLowerCase().includes('week') || p.product?.identifier?.toLowerCase().includes('week'));
       setSelectedPackage(annual?.identifier || monthly?.identifier || weekly?.identifier || packages[0].identifier);
     }
   }, [packages, selectedPackage]);
@@ -209,7 +209,8 @@ export const PaywallScreen2: React.FC<Props> = ({ onClose }) => {
                   pkg.packageType === 'ANNUAL' ||
                   pkg.identifier.toLowerCase().includes('annual') ||
                   pkg.identifier.toLowerCase().includes('year') ||
-                  pkg.product?.subscriptionPeriod === 'P1Y';
+                  pkg.product?.subscriptionPeriod === 'P1Y' ||
+                  pkg.product?.identifier?.toLowerCase().includes('annual');
                 const price = pkg.product.priceString;
 
                 let planLabel = t('paywall.monthly', 'Monthly');

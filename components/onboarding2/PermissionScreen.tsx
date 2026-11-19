@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
@@ -97,13 +97,28 @@ export const PermissionScreen: React.FC<Props> = ({ onDone }) => {
       }
       setLibraryPermission(libResult);
 
-      if (camResult.granted && micResult.granted && libResult.granted) {
+      if (camResult.granted) {
         setGranted(true);
         showCheckmark();
         // Auto continue after animation
         setTimeout(() => {
           onDone();
         }, 1200);
+      } else {
+        Alert.alert(
+          t('onboarding2.permission.camera_required_title', 'Camera Access Required'),
+          t(
+            'onboarding2.permission.camera_required_desc',
+            'RetroCam needs camera access to capture vintage photos and videos. Please enable camera permission to continue.'
+          ),
+          [
+            { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+            {
+              text: t('common.open_settings', 'Open Settings'),
+              onPress: () => Linking.openSettings(),
+            },
+          ]
+        );
       }
     } catch (e) {
       console.error('Permission error:', e);

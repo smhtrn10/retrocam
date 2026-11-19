@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   PanResponder,
+  Linking,
 } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ import {
   Timer,
   Grid3x3,
   Sliders,
+  Camera as CameraIcon,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraCarousel } from '@/components/CameraCarousel';
@@ -46,6 +48,7 @@ import { useTrending } from '@/hooks/useTrending';
 import { useDevice } from '@/hooks/useDevice';
 import { CAMERA_LENSES, LensType } from '@/constants/lenses';
 import { playMechanicalShutterSound, playTimerTickSound } from '@/utils/soundEngine';
+import { trackLaunchAndPromptReview } from '@/utils/storeReview';
 
 // ─────────────────────────────────────────────────────────────
 //  Viewfinder HUD Overlay (Requirement R6)
@@ -199,8 +202,20 @@ export default function CameraScreen() {
   const [activeCategory, setActiveCategory] = useState<CamType | 'all'>('all');
   const cameraRef = useRef<CameraView>(null);
   const isMounted = useRef(true);
-  const { isPro, showPaywall } = usePurchases();
+  const { isPro, showPaywall, isOnboardingComplete } = usePurchases();
   const trendingPresets = useTrending();
+
+  // If first launch / onboarding not completed, route to onboarding immediately
+  useEffect(() => {
+    if (isOnboardingComplete === false) {
+      router.replace('/onboarding');
+    }
+  }, [isOnboardingComplete]);
+
+  // Prompt native store review on 2nd and subsequent launches if not reviewed
+  useEffect(() => {
+    trackLaunchAndPromptReview();
+  }, []);
   
   const [aspectRatio, setAspectRatio] = useState<'full' | '1:1' | '3:2' | '4:5'>('full');
   const [isSnapMode, setIsSnapMode] = useState(false);
@@ -673,6 +688,34 @@ export default function CameraScreen() {
         
         <View style={[styles.viewfinderFrame, { width: cameraSize.width, height: cameraSize.height, alignSelf: 'center' }]}>
           <View style={{ flex: 1, overflow: 'hidden', borderRadius: 12, borderWidth: 4, borderColor: '#2E2E2E', position: 'relative' }}>
+            {permission && !permission.granted && (
+              <View style={styles.permissionBlockedContainer}>
+                <CameraIcon size={44 * uiScale} color="#FFB800" />
+                <Text style={[styles.permissionBlockedTitle, { fontSize: 16 * uiScale }]}>
+                  {t('camera.permission_required', 'Camera Access Required')}
+                </Text>
+                <Text style={[styles.permissionBlockedSub, { fontSize: 11 * uiScale }]}>
+                  {t('camera.permission_desc', 'RetroCam needs camera permission to capture vintage photos.')}
+                </Text>
+                <TouchableOpacity
+                  style={styles.permissionEnableBtn}
+                  onPress={() => {
+                    if (permission.canAskAgain) {
+                      requestPermission();
+                    } else {
+                      Linking.openSettings();
+                    }
+                  }}
+                >
+                  <Text style={styles.permissionEnableBtnText}>
+                    {permission.canAskAgain
+                      ? t('camera.enable_camera', 'Enable Camera')
+                      : t('camera.open_settings', 'Open Settings')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {isCameraActive && (
               <CameraView
                 ref={cameraRef}
@@ -934,7 +977,10 @@ export default function CameraScreen() {
         </View>
 
         {/* ── Top bar ── */}
-        <View style={[styles.topBar, { paddingTop: isTablet ? 20 : 10, paddingHorizontal: isTablet ? 32 : 16 }]}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.topBar, { paddingTop: isTablet ? 20 : 10, paddingHorizontal: isTablet ? 32 : 16 }]}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * uiScale }}>
             {!isSnapMode && (
               <TouchableOpacity
@@ -964,7 +1010,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.topBarCenter}>
+          <View style={styles.topBarCenter} pointerEvents="box-none">
             {!isPro ? (
               <TouchableOpacity style={styles.freePill} onPress={() => showPaywall()}>
                 <Text style={styles.freeTextTag}>{t('common.free')}</Text>
@@ -977,11 +1023,13 @@ export default function CameraScreen() {
               </TouchableOpacity>
             )}
             
-            <ScrollView
+            <GHScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.controlsScrollView}
               contentContainerStyle={styles.controlsRow}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
             >
               <TouchableOpacity style={styles.controlBtn} onPress={toggleAspectRatio}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>{aspectRatio === 'full' ? 'FULL' : aspectRatio}</Text>
@@ -1020,7 +1068,7 @@ export default function CameraScreen() {
               <TouchableOpacity style={[styles.controlBtn, isSnapMode && styles.controlBtnActive]} onPress={toggleSnapMode}>
                 <Text style={[styles.controlBtnText, { fontSize: 10 * uiScale }]}>SNAP</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </GHScrollView>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * uiScale }}>
@@ -1414,6 +1462,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    zIndex: 100,
+    elevation: 40,
   },
   iconButton: {
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -1609,6 +1659,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginHorizontal: 4,
+    zIndex: 101,
+    elevation: 41,
   },
   controlsScrollView: {
     maxWidth: '100%',
@@ -2095,5 +2147,38 @@ const styles = StyleSheet.create({
   },
   lensTagline: {
     color: '#8E8E93',
+  },
+  permissionBlockedContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 40,
+    elevation: 25,
+  },
+  permissionBlockedTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  permissionBlockedSub: {
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginBottom: 18,
+    lineHeight: 16,
+  },
+  permissionEnableBtn: {
+    backgroundColor: '#FFB800',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  permissionEnableBtnText: {
+    color: '#000000',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

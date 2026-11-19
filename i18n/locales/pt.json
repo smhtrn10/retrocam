@@ -120,7 +120,11 @@
     "benefit_3": "No ads, no watermarks",
     "benefit_4": "Priority AI processing",
     "benefit_5": "Exclusive golden hour features",
-    "benefit_6": "Cancel anytime"
+    "benefit_6": "Cancel anytime",
+    "counter_verb": "editando",
+    "continue_btn": "Continuar",
+    "trial_disclaimer": "Teste grátis de 3 dias, depois {{price}}/ano",
+    "people_verb": "pessoas {{verb}} agora"
   },
   "permission": {
     "title": "Acesso necessário",
@@ -143,7 +147,9 @@
     "success": "Success",
     "ok": "OK",
     "privacy_policy": "Privacy Policy",
-    "terms_of_use": "Terms of Use"
+    "terms_of_use": "Terms of Use",
+    "cancel": "Cancelar",
+    "open_settings": "Abrir configurações"
   },
   "settings": {
     "title": "Settings",
@@ -155,7 +161,10 @@
     "restore": "Restore Purchases",
     "rate": "Rate RetroCam",
     "contact": "Contact Support",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "language": "Idioma",
+    "rate_app": "Avaliar RetroCam",
+    "terms": "Termos de uso"
   },
   "video": {
     "hint": "9:16 · Max 60s · Saves to gallery",
@@ -167,10 +176,10 @@
     }
   },
   "camera_types": {
+    "120": "Formato 120",
     "disposable": "Descartável",
     "modern": "Moderno",
     "vhs": "VHS",
-    "120": "Formato 120",
     "8mm": "Cinema 8mm",
     "digital-y2k": "Digital Y2K",
     "half-frame": "Meia Moldura",
@@ -276,7 +285,9 @@
       "allow": "Permitir e Continuar",
       "skip": "Continuar →",
       "granted": "Tudo Pronto!",
-      "requesting": "Solicitando…"
+      "requesting": "Solicitando…",
+      "camera_required_title": "Acesso à câmera necessário",
+      "camera_required_desc": "O RetroCam precisa de acesso à câmera para capturar fotos e vídeos vintage. Ative a permissão para continuar."
     },
     "paywall": {
       "title": "Desbloqueie sua estética vintage",
@@ -288,5 +299,11 @@
       "benefit_4": "Exportação em 4K / HD",
       "benefit_5": "Vazamentos de luz e grãos exclusivos"
     }
+  },
+  "camera": {
+    "permission_required": "Acesso à câmera necessário",
+    "permission_desc": "O RetroCam precisa de acesso à câmera para capturar fotos e vídeos vintage.",
+    "enable_camera": "Ativar câmera",
+    "open_settings": "Abrir configurações"
   }
 }

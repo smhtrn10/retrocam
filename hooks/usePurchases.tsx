@@ -13,10 +13,10 @@ const API_KEYS = {
 // These are display-only — actual purchase goes through RevenueCat
 export const FALLBACK_PACKAGES: PurchasesPackage[] = [
   {
-    identifier: 'annual',
+    identifier: '$rc_annual',
     packageType: 'ANNUAL' as any,
     product: {
-      identifier: 'retrocam_annual',
+      identifier: 'com.retrocam.app.annual',
       price: 14.99,
       priceString: '$14.99',
       currencyCode: 'USD',
@@ -34,10 +34,10 @@ export const FALLBACK_PACKAGES: PurchasesPackage[] = [
     },
   } as unknown as PurchasesPackage,
   {
-    identifier: 'monthly',
+    identifier: '$rc_monthly',
     packageType: 'MONTHLY' as any,
     product: {
-      identifier: 'retrocam_monthly',
+      identifier: 'com.retrocam.app.monthly',
       price: 2.99,
       priceString: '$2.99',
       currencyCode: 'USD',
@@ -48,10 +48,10 @@ export const FALLBACK_PACKAGES: PurchasesPackage[] = [
     },
   } as unknown as PurchasesPackage,
   {
-    identifier: 'weekly',
+    identifier: '$rc_weekly',
     packageType: 'WEEKLY' as any,
     product: {
-      identifier: 'retrocam_weekly',
+      identifier: 'com.retrocam.app.weekly',
       price: 0.99,
       priceString: '$0.99',
       currencyCode: 'USD',
@@ -159,8 +159,14 @@ export const usePurchases = create<PurchasesState>((set, get) => {
         await checkEntitlements(customerInfo);
 
         const offerings = await Purchases.getOfferings();
-        if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
-          set({ packages: offerings.current.availablePackages });
+        const activeOffering = (offerings.current && offerings.current.availablePackages.length > 0)
+          ? offerings.current
+          : (offerings.all && offerings.all['default'] && offerings.all['default'].availablePackages.length > 0)
+            ? offerings.all['default']
+            : Object.values(offerings.all || {}).find(o => o.availablePackages.length > 0);
+
+        if (activeOffering && activeOffering.availablePackages.length > 0) {
+          set({ packages: activeOffering.availablePackages });
         } else {
           console.warn("No active offering packages found in RevenueCat, using FALLBACK_PACKAGES");
           set({ packages: FALLBACK_PACKAGES });

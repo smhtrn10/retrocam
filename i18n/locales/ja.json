@@ -120,7 +120,11 @@
     "benefit_3": "No ads, no watermarks",
     "benefit_4": "Priority AI processing",
     "benefit_5": "Exclusive golden hour features",
-    "benefit_6": "Cancel anytime"
+    "benefit_6": "Cancel anytime",
+    "counter_verb": "編集",
+    "continue_btn": "続ける",
+    "trial_disclaimer": "3日間無料トライアル、その後{{price}}/年",
+    "people_verb": "人が今すぐ{{verb}}中"
   },
   "permission": {
     "title": "アクセスが必要です",
@@ -143,7 +147,9 @@
     "success": "Success",
     "ok": "OK",
     "privacy_policy": "Privacy Policy",
-    "terms_of_use": "Terms of Use"
+    "terms_of_use": "Terms of Use",
+    "cancel": "キャンセル",
+    "open_settings": "設定を開く"
   },
   "settings": {
     "title": "Settings",
@@ -155,7 +161,10 @@
     "restore": "Restore Purchases",
     "rate": "Rate RetroCam",
     "contact": "Contact Support",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "language": "言語",
+    "rate_app": "RetroCamを評価する",
+    "terms": "利用規約"
   },
   "video": {
     "hint": "9:16 · Max 60s · Saves to gallery",
@@ -167,10 +176,10 @@
     }
   },
   "camera_types": {
+    "120": "120フォーマット",
     "disposable": "使い捨て",
     "modern": "モダン",
     "vhs": "VHS",
-    "120": "120フォーマット",
     "8mm": "8mmシネマ",
     "digital-y2k": "Y2Kデジタル",
     "half-frame": "ハーフフレーム",
@@ -276,7 +285,9 @@
       "allow": "許可して続ける",
       "skip": "続ける →",
       "granted": "準備完了！",
-      "requesting": "リクエスト中…"
+      "requesting": "リクエスト中…",
+      "camera_required_title": "カメラへのアクセスが必要です",
+      "camera_required_desc": "RetroCamで写真や動画を撮影するにはカメラへのアクセスが必要です。続行するには許可してください。"
     },
     "paywall": {
       "title": "ヴィンテージエステティックを解放",
@@ -288,5 +299,11 @@
       "benefit_4": "4K / HD書き出し品質",
       "benefit_5": "限定の光漏れ＆グレイン"
     }
+  },
+  "camera": {
+    "permission_required": "カメラへのアクセスが必要です",
+    "permission_desc": "RetroCamでヴィンテージ写真や動画を撮影するには、カメラへのアクセスが必要です。",
+    "enable_camera": "カメラを有効にする",
+    "open_settings": "設定を開く"
   }
 }

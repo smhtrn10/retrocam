@@ -84,6 +84,29 @@
       "benefit_3": "Sans pubs ni filigranes",
       "benefit_4": "Export qualité 4K / HD",
       "benefit_5": "Fuites de lumière & grains exclusifs"
+    },
+    "permission": {
+      "title": "Accès à la caméra",
+      "subtitle": "RetroCam a besoin d'accéder à votre appareil photo, micro et galerie pour capturer et enregistrer des photos et vidéos vintage.",
+      "expo_warning": "Expo Go: Permissions de galerie limitées",
+      "camera": {
+        "title": "Appareil photo",
+        "desc": "Prendre photos et vidéos"
+      },
+      "microphone": {
+        "title": "Microphone",
+        "desc": "Enregistrer l'audio avec la vidéo"
+      },
+      "gallery": {
+        "title": "Galerie",
+        "desc": "Enregistrer et modifier vos clichés"
+      },
+      "allow": "Autoriser et continuer",
+      "skip": "Continuer →",
+      "granted": "Tout est prêt !",
+      "requesting": "Demande en cours…",
+      "camera_required_title": "Accès à la caméra requis",
+      "camera_required_desc": "RetroCam a besoin d'accéder à l'appareil photo pour capturer des photos et vidéos. Veuillez autoriser l'accès pour continuer."
     }
   },
   "onboarding": {
@@ -207,7 +230,11 @@
     "benefit_3": "No ads, no watermarks",
     "benefit_4": "Priority AI processing",
     "benefit_5": "Exclusive golden hour features",
-    "benefit_6": "Cancel anytime"
+    "benefit_6": "Cancel anytime",
+    "counter_verb": "en train d'éditer",
+    "continue_btn": "Continuer",
+    "trial_disclaimer": "3 jours d'essai gratuit, puis {{price}}/an",
+    "people_verb": "personnes {{verb}} en ce moment"
   },
   "permission": {
     "title": "Accès requis",
@@ -230,7 +257,9 @@
     "success": "Success",
     "ok": "OK",
     "privacy_policy": "Privacy Policy",
-    "terms_of_use": "Terms of Use"
+    "terms_of_use": "Terms of Use",
+    "cancel": "Annuler",
+    "open_settings": "Ouvrir les réglages"
   },
   "settings": {
     "title": "Settings",
@@ -242,7 +271,10 @@
     "restore": "Restore Purchases",
     "rate": "Rate RetroCam",
     "contact": "Contact Support",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "language": "Langue",
+    "rate_app": "Évaluer RetroCam",
+    "terms": "Conditions d'utilisation"
   },
   "video": {
     "hint": "9:16 · Max 60s · Saves to gallery",
@@ -254,10 +286,10 @@
     }
   },
   "camera_types": {
+    "120": "Format 120",
     "disposable": "Jetable",
     "modern": "Moderne",
     "vhs": "VHS",
-    "120": "Format 120",
     "8mm": "Cinéma 8mm",
     "digital-y2k": "Numérique Y2K",
     "half-frame": "Demi-cadre",
@@ -267,5 +299,11 @@
     "16mm": "Cinéma 16mm",
     "camcorder": "Caméscope",
     "special": "Spécial"
+  },
+  "camera": {
+    "permission_required": "Accès à la caméra requis",
+    "permission_desc": "RetroCam a besoin d'accéder à l'appareil photo pour capturer des photos et vidéos vintage.",
+    "enable_camera": "Activer la caméra",
+    "open_settings": "Ouvrir les réglages"
   }
 }

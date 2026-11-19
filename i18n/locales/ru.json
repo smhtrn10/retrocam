@@ -120,7 +120,11 @@
     "benefit_3": "No ads, no watermarks",
     "benefit_4": "Priority AI processing",
     "benefit_5": "Exclusive golden hour features",
-    "benefit_6": "Cancel anytime"
+    "benefit_6": "Cancel anytime",
+    "counter_verb": "редактируют",
+    "continue_btn": "Продолжить",
+    "trial_disclaimer": "3 дня бесплатно, затем {{price}}/год",
+    "people_verb": "человек {{verb}} прямо сейчас"
   },
   "permission": {
     "title": "Требуется доступ",
@@ -143,7 +147,9 @@
     "success": "Success",
     "ok": "OK",
     "privacy_policy": "Privacy Policy",
-    "terms_of_use": "Terms of Use"
+    "terms_of_use": "Terms of Use",
+    "cancel": "Отмена",
+    "open_settings": "Открыть настройки"
   },
   "settings": {
     "title": "Settings",
@@ -155,7 +161,10 @@
     "restore": "Restore Purchases",
     "rate": "Rate RetroCam",
     "contact": "Contact Support",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "language": "Язык",
+    "rate_app": "Оценить RetroCam",
+    "terms": "Условия использования"
   },
   "video": {
     "hint": "9:16 · Max 60s · Saves to gallery",
@@ -167,10 +176,10 @@
     }
   },
   "camera_types": {
+    "120": "Формат 120",
     "disposable": "Одноразовая",
     "modern": "Современная",
     "vhs": "VHS",
-    "120": "Формат 120",
     "8mm": "Кино 8мм",
     "digital-y2k": "Цифровой Y2K",
     "half-frame": "Полукадровый",
@@ -276,7 +285,9 @@
       "allow": "Разрешить и продолжить",
       "skip": "Продолжить →",
       "granted": "Всё готово!",
-      "requesting": "Запрос…"
+      "requesting": "Запрос…",
+      "camera_required_title": "Требуется доступ к камере",
+      "camera_required_desc": "RetroCam нужен доступ к камере для съёмки винтажных фото и видео. Пожалуйста, разрешите доступ для продолжения."
     },
     "paywall": {
       "title": "Открой свою винтажную эстетику",
@@ -288,5 +299,11 @@
       "benefit_4": "Экспорт в 4K / HD",
       "benefit_5": "Эксклюзивные засветы и зерно"
     }
+  },
+  "camera": {
+    "permission_required": "Требуется доступ к камере",
+    "permission_desc": "RetroCam необходим доступ к камере для съёмки винтажных фото и видео.",
+    "enable_camera": "Включить камеру",
+    "open_settings": "Открыть настройки"
   }
 }

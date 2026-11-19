@@ -94,7 +94,9 @@
       "allow": "Allow & Continue",
       "skip": "Continue →",
       "granted": "All Set!",
-      "requesting": "Requesting…"
+      "requesting": "Requesting…",
+      "camera_required_title": "Camera Access Required",
+      "camera_required_desc": "RetroCam needs camera access to capture vintage photos and videos. Please enable camera permission to continue."
     },
     "paywall": {
       "title": "Unlock Your Vintage Aesthetic",
@@ -228,7 +230,11 @@
     "benefit_3": "No ads, no watermarks",
     "benefit_4": "Priority AI processing",
     "benefit_5": "Exclusive golden hour features",
-    "benefit_6": "Cancel anytime"
+    "benefit_6": "Cancel anytime",
+    "counter_verb": "editing",
+    "continue_btn": "Continue",
+    "trial_disclaimer": "3-day free trial, then {{price}}/year",
+    "people_verb": "people {{verb}} right now"
   },
   "permission": {
     "title": "Access Required",
@@ -251,7 +257,9 @@
     "success": "Success",
     "ok": "OK",
     "privacy_policy": "Privacy Policy",
-    "terms_of_use": "Terms of Use"
+    "terms_of_use": "Terms of Use",
+    "cancel": "Cancel",
+    "open_settings": "Open Settings"
   },
   "settings": {
     "title": "Settings",
@@ -263,7 +271,10 @@
     "restore": "Restore Purchases",
     "rate": "Rate RetroCam",
     "contact": "Contact Support",
-    "privacy": "Privacy Policy"
+    "privacy": "Privacy Policy",
+    "language": "Language",
+    "rate_app": "Rate RetroCam",
+    "terms": "Terms of Use"
   },
   "video": {
     "hint": "9:16 · Max 60s · Saves to gallery",
@@ -275,10 +286,10 @@
     }
   },
   "camera_types": {
+    "120": "120 Format",
     "disposable": "Disposable",
     "modern": "Modern",
     "vhs": "VHS",
-    "120": "120 Format",
     "8mm": "8mm Cinema",
     "digital-y2k": "Y2K Digital",
     "half-frame": "Half Frame",
@@ -288,5 +299,11 @@
     "16mm": "16mm Cinema",
     "camcorder": "Camcorder",
     "special": "Special"
+  },
+  "camera": {
+    "permission_required": "Camera Access Required",
+    "permission_desc": "RetroCam needs camera access to capture vintage photos and videos.",
+    "enable_camera": "Enable Camera",
+    "open_settings": "Open Settings"
   }
 }
